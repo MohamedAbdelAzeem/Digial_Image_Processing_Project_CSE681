@@ -1,0 +1,12 @@
+name: dip-project1
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - numpy
+  - scipy
+  - opencv
+  - scikit-image
+  - pytorch
+  - torchvision
+  - jupyterlab

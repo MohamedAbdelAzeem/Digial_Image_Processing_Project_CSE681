@@ -1,0 +1,109 @@
+% ============================================================
+% Milestone 1 -- Project Proposal & Literature Review 
+% DIP Team Project
+% ============================================================
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[round]{natbib}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{xcolor}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!50!black,
+  citecolor=blue!50!black,
+  urlcolor=blue!50!black
+}
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+
+\title{\LARGE Project Proposal \& Literature Review\\[4pt]
+  \large Lightweight Learned Image Compression for Laptop-Class Training}
+\author{\todo{Student A} \and \todo{Student B} \and \todo{Student C}}
+\date{Milestone 1\\CSE681 --- Digital Image Processing}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\todo{In 3--5 sentences, state the problem, motivation, planned approach, and
+dataset and baseline.}
+\end{abstract}
+
+\section{Problem Statement and Motivation}
+\todo{Describe the problem, project scope, motivation, and connection to a course
+topic.}
+
+\section{Related Work}
+\todo{Summarize at least four references, including at least two from 2023--2026.
+Explain how the work informs this project.}
+
+\begin{table}[h]
+\centering
+\caption{Key references and their relevance to this project.}
+\begin{tabular}{@{}p{0.36\linewidth}p{0.12\linewidth}p{0.42\linewidth}@{}}
+\toprule
+\textbf{Reference} & \textbf{Year} & \textbf{Relevance} \\
+\midrule
+\citep{balle2018scalehyperprior} & 2018 & Scale-hyperprior learned image codec. \\
+\citep{he2022elic} & 2022 & Efficient learned image compression architecture. \\
+\todo{Recent reference} & \todo{Year} & \todo{Relevance} \\
+\todo{Recent reference} & \todo{Year} & \todo{Relevance} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Dataset and Baseline Plan}
+\todo{Specify the DIV2K training subset and crop size, Kodak/Tecnick evaluation
+sets, dataset links and licenses, and the JPEG baseline at matched bits-per-pixel.}
+
+\section{Proposed Method}
+\todo{Describe the reduced-width hyperprior codec, planned width or latent-channel
+settings, and include an architecture figure or pseudocode.}
+
+\section{Evaluation Plan}
+\todo{Define how bits-per-pixel (bpp), PSNR, and MS-SSIM will be measured and how
+the rate--distortion curves will be compared.}
+
+\section{Feasibility and Compute Plan}
+\todo{State the compute tier, training setup, expected experiment time, and result
+of the one-training-step feasibility test.}
+
+\subsection{Minimum Viable Deliverable}
+\todo{State the smallest working experiment that produces a valid comparison with
+JPEG.}
+
+\subsection{Stretch Goal}
+\todo{State what the team will attempt if the MVP is on schedule by Week 5--6.}
+
+\section{Risks and Mitigations}
+\begin{itemize}[leftmargin=*]
+  \item \todo{Risk and mitigation or fallback.}
+  \item \todo{Risk and mitigation or fallback.}
+\end{itemize}
+
+\section{Work Breakdown}
+\begin{table}[h]
+\centering
+\caption{Task allocation by milestone and team member.}
+\begin{tabular}{@{}p{0.16\linewidth}p{0.25\linewidth}p{0.25\linewidth}p{0.25\linewidth}@{}}
+\toprule
+\textbf{Milestone} & \textbf{Student A} & \textbf{Student B} & \textbf{Student C} \\
+\midrule
+M1 (Week 3) & \todo{Tasks} & \todo{Tasks} & \todo{Tasks} \\
+M2 (Week 6) & \todo{Tasks} & \todo{Tasks} & \todo{Tasks} \\
+M3 (Week 9) & \todo{Tasks} & \todo{Tasks} & \todo{Tasks} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\bibliographystyle{unsrtnat}
+\bibliography{references}
+
+\end{document}
