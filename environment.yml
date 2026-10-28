@@ -3,10 +3,18 @@ channels:
   - conda-forge
 dependencies:
   - python=3.10
-  - numpy
+  - numpy<2
   - scipy
   - opencv
   - scikit-image
   - pytorch
   - torchvision
   - jupyterlab
+  - pip
+  - pip:
+      - compressai==1.2.8
+      - matplotlib>=3.8,<4
+      - pandas>=2.2,<3
+      - pytorch-msssim==1.0.0
+      - remotezip==0.12.3
+      - truststore>=0.10,<1

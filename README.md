@@ -51,7 +51,8 @@ Alternatively, upload `report.tex` and `references.bib` to
 
 ## Project code dependencies
 
-CompressAI is not included in the Conda environment because its native extension
-may require a C++ build toolchain on Windows. Install it separately if your
-implementation uses it, following the
+All project dependencies are defined in `environment.yml`. Conda installs the core
+packages and then installs the notebook dependencies, including CompressAI, through
+the YAML file's `pip` section. CompressAI's native extension may require a compatible
+C++ build toolchain on Windows; see the
 [CompressAI installation instructions](https://interdigitalinc.github.io/CompressAI/installation.html).
