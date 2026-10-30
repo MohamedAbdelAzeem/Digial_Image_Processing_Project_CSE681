@@ -6,6 +6,8 @@ from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
 
+from data.paths import DIV2K_DIR, DIV2K_VALID_DIR, KODAK_DIR
+
 
 IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
 
@@ -51,12 +53,14 @@ def inspect_folder(name: str, folder: Path) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--div2k-dir", type=Path, default=Path("data/raw/DIV2K_train_HR"))
-    parser.add_argument("--kodak-dir", type=Path, default=Path("data/raw/kodak"))
+    parser.add_argument("--div2k-dir", type=Path, default=DIV2K_DIR)
+    parser.add_argument("--div2k-valid-dir", type=Path, default=DIV2K_VALID_DIR)
+    parser.add_argument("--kodak-dir", type=Path, default=KODAK_DIR)
     args = parser.parse_args()
 
     results = [
         inspect_folder("DIV2K train", args.div2k_dir),
+        inspect_folder("DIV2K valid", args.div2k_valid_dir),
         inspect_folder("Kodak", args.kodak_dir),
     ]
     return 0 if all(results) else 1

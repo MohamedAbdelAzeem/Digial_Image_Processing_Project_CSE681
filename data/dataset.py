@@ -1,43 +1,51 @@
 """PyTorch dataset for randomly cropped DIV2K training images."""
 
 import random
+from collections.abc import Sequence
 from pathlib import Path
 
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
 
+from data.paths import DIV2K_DIR, DIV2K_VALID_DIR
+
 
 IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
 
 
 class DIV2KDataset(Dataset):
-    """Load DIV2K images as normalized RGB crops with random flip augmentation."""
+    """Load DIV2K images as normalized RGB crops with random flip augmentation.
+
+    `root` is one folder or a sequence of folders; the default is DIV2K train + valid (800 + 100).
+    """
 
     def __init__(
         self,
-        root: str | Path = "data/raw/DIV2K_train_HR",
-        crop_size: int = 192,
+        root: str | Path | Sequence[str | Path] = (DIV2K_DIR, DIV2K_VALID_DIR),
+        crop_size: int = 256,
         horizontal_flip: bool = True,
         vertical_flip: bool = True,
     ) -> None:
-        self.root = Path(root)
+        self.roots = [Path(root)] if isinstance(root, (str, Path)) else [Path(r) for r in root]
         self.crop_size = crop_size
         self.horizontal_flip = horizontal_flip
         self.vertical_flip = vertical_flip
 
         if crop_size <= 0:
             raise ValueError("crop_size must be a positive integer")
-        if not self.root.is_dir():
-            raise FileNotFoundError(f"DIV2K image directory does not exist: {self.root}")
+        for folder in self.roots:
+            if not folder.is_dir():
+                raise FileNotFoundError(f"DIV2K image directory does not exist: {folder}")
 
         self.image_paths = sorted(
             path
-            for path in self.root.rglob("*")
+            for folder in self.roots
+            for path in folder.rglob("*")
             if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
         )
         if not self.image_paths:
-            raise ValueError(f"No supported image files found in {self.root}")
+            raise ValueError(f"No supported image files found in {self.roots}")
 
     def __len__(self) -> int:
         return len(self.image_paths)
