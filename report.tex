@@ -1,8 +1,8 @@
 % ============================================================
 % Milestone 1 -- Project Proposal & Literature Review
 % DIP Team Project
-% Student C evaluation contribution completed;
-% Student A / Student B sections intentionally left as TODOs.
+% Student A (data & baseline) and Student C (evaluation) contributions
+% completed; Student B sections intentionally left as TODOs.
 % ============================================================
 
 \documentclass[11pt]{article}
@@ -30,7 +30,7 @@
 
 \title{\LARGE Project Proposal \& Literature Review\\[4pt]
        \large Lightweight Learned Image Compression for Laptop-Class Training}
-\author{\todo{Student A} \and Mohamed Abdelazeem \and Zeyad Tarek}
+\author{Mohamad Sherif \and Mohamed Abdelazeem \and Zeyad Tarek}
 \date{Milestone 1\\CSE681 --- Digital Image Processing}
 
 \begin{document}
@@ -109,21 +109,35 @@ reduced before compression quality or practical usability is
 significantly affected.
 
 \section{Related Work}
-\todo{Student A/B: Summarize at least four references, including at least
-two from 2023--2026. Explain how the work informs this project. Keep
-the bibliography entries in the shared references.bib file.}
+Learned image compression replaces the hand-designed transforms of codecs such as
+JPEG~\citep{wallace1992jpeg} with neural networks trained end to end on a
+rate--distortion objective. \citet{balle2017endtoend} introduced the basic recipe: a
+convolutional analysis transform maps the image to a latent $y$, which is quantized
+and entropy coded, and a synthesis transform reconstructs the image. Quantization is
+replaced by additive uniform noise during training so that the rate term remains
+differentiable.
 
-Ballé et al. introduce a scale-hyperprior model for learned image compression, which serves as a foundational approach for our work \citep{balle2018scalehyperprior}.
+\citet{balle2018scalehyperprior} added a \emph{scale hyperprior}: a second, much
+smaller latent $z$ is transmitted as side information and predicts the standard
+deviation of a Gaussian for every element of $y$. This captures spatially varying
+statistics that a fixed factorized prior misses and is the architecture we
+reproduce at reduced width. \citet{minnen2018joint} combined the hyperprior with a
+spatial autoregressive context model. This improves rate--distortion performance,
+but decoding becomes sequential and therefore slow, which conflicts with our
+laptop-class goal.
 
-Jiang et al. propose MLIC, which uses channel and spatial context to
-better estimate latent probabilities and reduce coding rate
-\citep{jiang2023mlic}. This can be investigated as a potential
-improvement to our model.
-
-Luo et al. propose ERHP to prune redundant capacity in a codec's
-hyperprior module. They report reducing total model parameters by at
-least 22.6\% while improving rate--distortion performance
-\citep{luo2022erhp}. This will be a reference for understanding model pruning and efficiency considerations.
+ELIC~\citep{he2022elic} addresses this cost with unevenly grouped channel contexts
+and a checkerboard spatial context. It keeps most of the gain of context modelling
+while decoding in parallel, and its published operating points are our stretch
+target. More recent work increases capacity in different ways.
+\citet{liu2023tcm} mix Transformer and CNN blocks in the transforms and entropy
+model, gaining rate--distortion performance at a higher computational cost.
+\citet{duan2023qresvae} generalize the two-level hyperprior to a deeper hierarchy of
+quantized latent variables. Both show that quality grows with model complexity,
+which motivates our study of how far width and latent channels can shrink before
+performance drops. CompressAI~\citep{begaint2020compressai} provides reference
+PyTorch implementations, pretrained models and evaluation tools for these codecs;
+we build on it to keep our results comparable with the literature.
 
 \begin{table}[htbp]
 \centering
@@ -132,46 +146,78 @@ least 22.6\% while improving rate--distortion performance
 \toprule
 \textbf{Reference} & \textbf{Year} & \textbf{Relevance} \\
 \midrule
-\citep{balle2018scalehyperprior} & 2018 &
-Scale-hyperprior learned image codec. \\
-\citep{luo2022erhp} & 2022 &
-Pruning redundant capacity in the hyperprior module. \\
-\citep{jiang2023mlic} & 2023 &
-Multi-reference entropy model combining channel and spatial context. \\
-\todo{Recent reference} & \todo{Year} & \todo{Relevance} \\
-\todo{Recent reference} & \todo{Year} & \todo{Relevance} \\
+\citep{balle2017endtoend} & 2017 & End-to-end learned transform coding; noise relaxation of quantization. \\
+\citep{balle2018scalehyperprior} & 2018 & Scale-hyperprior codec; the architecture we reproduce at reduced width. \\
+\citep{minnen2018joint} & 2018 & Autoregressive context plus hyperprior; better RD, but slow serial decoding. \\
+\citep{he2022elic} & 2022 & Efficient parallel context model; stretch-goal operating points. \\
+\citep{liu2023tcm} & 2023 & Transformer--CNN transforms; upper end of the complexity trade-off. \\
+\citep{duan2023qresvae} & 2023 & Hierarchical quantized VAE generalizing the hyperprior. \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \section{Dataset and Baseline Plan}
 
-The Kodak image dataset is used as the common evaluation dataset for
-the compression methods in this project. It contains 24 test images,
-each with a resolution of $768 \times 512$ pixels. The same original
-images will be used to evaluate both the conventional JPEG baseline
-and the learned compression model. Using an identical test set makes
-the comparison more consistent.
+\paragraph{Training data.} We train on DIV2K~\citep{agustsson2017div2k}, using both
+the training split (800 images) and the validation split (100 images) of the
+high-resolution set, about 2K pixels wide
+(\url{https://data.vision.ee.ethz.ch/cvl/DIV2K/}). Our loader,
+\texttt{DIV2KDataset}, draws a new random $256\times256$ crop from an image each
+time it is accessed and applies random horizontal and vertical flips. It returns
+RGB \texttt{float32} tensors in $[0,1]$, so a batch has shape $[B,3,256,256]$.
+Images are never resized, and an image smaller than the crop raises an error.
+Random cropping keeps memory and compute low enough for laptop training while
+still covering the full images over many epochs. A verification script checks
+that every image decodes before training starts; all 900 DIV2K images and all 24
+Kodak images pass. The dataset location is configured in one place
+(\texttt{data/paths.py}), so every team member can keep the data wherever they
+like on their own machine.
 
-The JPEG baseline is implemented in Python using the Pillow library.
-JPEG quality settings are varied to obtain multiple operating points
-with different file sizes and reconstruction qualities. For every
-compressed image, the actual output file size is recorded. The
-compressed file is then decoded, and the reconstructed image is
-compared with its original Kodak image.
+\paragraph{Evaluation data.} The Kodak image dataset~\citep{kodak} is used as the
+common evaluation dataset for the compression methods in this project. It
+contains 24 test images, each with a resolution of $768\times512$ pixels
+(\url{https://r0k.us/graphics/kodak/kodak/}). The same original images will be
+used to evaluate both the conventional JPEG baseline and the learned compression
+model. Kodak is never used for training. As a second, higher-resolution test set
+we plan to use Tecnick from the TESTIMAGES archive~\citep{asuni2014testimages}
+(\url{https://testimages.org/}), the 100 RGB images at $1200\times1200$ commonly
+used in the learned-compression literature. \todo{Confirm the Tecnick subset and
+its license after download (W5).}
 
-The current preliminary plots contain five averaged JPEG operating
-points. The exact quality settings associated with each point should
-be taken from the experiment CSV rather than inferred from the plotted
-coordinates. The evaluation script can also be run for the full planned
-quality list, if required by the team protocol.
+\paragraph{JPEG baseline.} The baseline uses Pillow (libjpeg) at its default
+settings, including 4:2:0 chroma subsampling. We run quality factors
+$Q\in\{10,20,30,50,70,85,95\}$. Each full image is encoded and decoded; BPP uses
+the actual JPEG file size including headers,
+$\text{bpp}=8\cdot\text{bytes}/(W\cdot H)$. PSNR is measured over RGB channels
+with peak value 255, MS-SSIM~\citep{wang2003msssim} uses the shared evaluation
+functions, and decode time is recorded. Table~\ref{tab:jpeg-kodak}
+contains the exact means for our full quality list. Student C's preliminary plots
+show five operating points; the lowest-rate measurements agree at about
+0.33~bpp and 26.7~dB.
 
-The JPEG results establish a conventional compression baseline. Once
-the learned codec is available, it will be evaluated on the same Kodak
-images using the same metric definitions.
+\begin{table}[htbp]
+\centering
+\caption{Pillow JPEG on Kodak (24 images, mean per quality factor).}
+\label{tab:jpeg-kodak}
+\begin{tabular}{@{}rrr@{}}
+\toprule
+\textbf{Q} & \textbf{bpp} & \textbf{PSNR (dB)} \\
+\midrule
+10 & 0.327 & 26.67 \\
+20 & 0.508 & 29.14 \\
+30 & 0.660 & 30.49 \\
+50 & 0.906 & 32.17 \\
+70 & 1.239 & 33.92 \\
+85 & 1.857 & 36.46 \\
+95 & 3.392 & 40.56 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\textbf{Dataset source:}
-\url{https://r0k.us/graphics/kodak/kodak/}
+The learned codec will be evaluated on the same Kodak images with the same
+metric definitions. Its final BPP will use the actual entropy-coded bitstream,
+not the training-time estimate; rate--distortion curves will be compared at
+matched BPP by interpolation.
 
 \section{Proposed Method}
 
@@ -218,6 +264,17 @@ After training, each selected model will be evaluated on the same
 Kodak images as the JPEG baseline. We will encode and decode the images
 and compare BPP, PSNR, and MS-SSIM using the evaluation pipeline
 described below. Final BPP will use the actual encoded bitstream size.
+
+\paragraph{Student A data pipeline.} Training batches are drawn from
+\texttt{DIV2KDataset} with a shuffled PyTorch \texttt{DataLoader}; each batch has
+shape $[B,3,256,256]$ and values in $[0,1]$. A new crop and flip is sampled on
+each access. The model requires height and width divisible by 64: its analysis
+transform downsamples by 16 and its hyper-analysis transform by a further 4.
+Thus a $256\times256$ crop gives a $16\times16$ latent $y$ and a $4\times4$
+hyperlatent $z$. Kodak's $768\times512$ images can be evaluated uncropped.
+Tecnick's $1200\times1200$ images will be padded to $1216\times1216$ and cropped
+back after decoding; BPP and image quality will be calculated using the original
+pixel dimensions.
 
 \begin{figure}[H]
     \centering
@@ -374,20 +431,32 @@ available. The available hardware may vary, so we will record the
 device, model configuration, image crop size, batch size, and training
 time for each experiment.
 
-Before beginning a full training run, we will first check that one
-training step completes, then run a short pilot to measure average
-step time and peak memory use. We have not completed these tests yet,
-so we cannot estimate the full training time. We will use the pilot
-results to select a feasible model width, crop size, and batch size,
-and adjust them if needed. During training, we will monitor progress
-and save checkpoints for evaluation.
+The one-step feasibility check is complete. On an Intel Core i7-11850H laptop
+with 64~GB RAM and an NVIDIA T1200 Laptop GPU, the CPU-only PyTorch 2.14 and
+CompressAI 1.2.8 environment loaded the pretrained quality-3 model ($N=128$,
+$M=192$, 5.08~M parameters) and completed one main and auxiliary optimizer step
+on a $256\times256$ crop from \texttt{DIV2KDataset}. The latent shapes were
+$y:192\times16\times16$ and $z:128\times4\times4$; encoder weights changed, and
+the evaluation-mode loss moved from 2.269 to 2.258. Real compression produced
+6{,}660 bytes (0.813~bpp, including 84 bytes for $z$); estimated eval bpp was
+0.810, within 0.5\%. This establishes feasibility of a step, not a training-time
+estimate or a trained reduced-width model. The automated integration test also
+completed a training step and compress/decompress round trip using a reduced
+model ($N=32$, $M=48$) on batches from \texttt{DIV2KDataset}. All 18 tests passed
+in about 40~s on CPU. A short training pilot is still needed to estimate step
+time and peak memory before choosing a full training schedule.
 
 
 \subsection{Minimum Viable Deliverable}
-\todo{As a team, state the smallest working experiment that produces
-a valid comparison with JPEG. At minimum, it should include a working
-learned encoder/decoder, actual encoded bitstream size, and evaluation
-on the same Kodak images.}
+The minimum deliverable is one trained reduced-width scale-hyperprior model
+that encodes and decodes each of the 24 full-resolution Kodak images. We will
+calculate BPP from the actual encoded bitstream and measure PSNR and MS-SSIM
+against the original images using the same metric implementations as for JPEG.
+The results will include per-image measurements, dataset averages, and a
+rate--distortion comparison at matched BPP. The completed one-step feasibility
+test establishes that the data-to-model path and real entropy-coded
+compress/decompress path run; it does not yet satisfy the trained-model portion
+of this deliverable.
 
 \subsection{Stretch Goal}
 If the minimum experiment is complete by Week 5--6 and compute permits,
@@ -459,7 +528,10 @@ reference.
 \textbf{Milestone} & \textbf{Student A} & \textbf{Student B} & \textbf{Student C} \\
 \midrule
 M1 (Week 3) &
-\todo{Dataset preparation and JPEG baseline tasks} &
+Download and verify DIV2K train+val and Kodak; implement
+\texttt{DIV2KDataset} (random $256\times256$ crops, flips); shared
+dataset-path configuration; Pillow JPEG baseline runner; data-to-model
+integration test; hyperprior literature survey. &
 Review hyperprior design; determine the parameters for the model and run a
 one-step feasibility test. &
 Prepare Kodak evaluation dataset; implement BPP, PSNR, and
@@ -467,7 +539,8 @@ MS-SSIM calculations; establish the JPEG baseline methodology
 and generate preliminary plots. \\
 
 M2 (Week 6) &
-\todo{Training/data pipeline progress} &
+JPEG rate--distortion curve on Kodak in the shared results file;
+download, clean and inspect Tecnick; help monitor training. &
 Implement the training and encode/decode pipeline; train the model
 and verify that it produces a valid bitstream. &
 Complete and validate JPEG experiments; organize per-image
@@ -475,7 +548,8 @@ and averaged results; generate and document preliminary
 rate--distortion curves. \\
 
 M3 (Week 9) &
-\todo{Final data/training contribution} &
+JPEG on Tecnick and final JPEG/Tecnick comparison table; visual
+comparison crops; Data and Traditional Baselines report sections. &
 Finalize the trained model and bitstream encoder/decoder; document
 the model and training settings and support the final evaluation. &
 Evaluate the learned codec on Kodak; compare it against JPEG
@@ -484,6 +558,30 @@ final result tables and qualitative comparisons. \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\section{Student A Deliverables and Current Status}
+
+The following data and baseline tasks have been completed:
+\begin{itemize}[leftmargin=*]
+    \item Downloaded and verified DIV2K train (800 images), DIV2K validation
+    (100 images) and Kodak (24 images); every image decodes and all are RGB.
+    \item Implemented \texttt{DIV2KDataset}: random $256\times256$ crops with
+    horizontal and vertical flips, returning \texttt{float32} RGB tensors in
+    $[0,1]$ as the agreed interface to the model ($[B,3,H,W]$).
+    \item Added a shared dataset-location setting (\texttt{data/paths.py}) used by
+    the loader, scripts, tests and training notebook.
+    \item Implemented the Pillow JPEG baseline runner and produced the Kodak
+    results in Table~\ref{tab:jpeg-kodak}.
+    \item Connected the one-training-step notebook to \texttt{DIV2KDataset} and
+    added an integration test for the data-to-model interface; all 18 automated
+    tests pass.
+    \item Completed the hyperprior literature survey and drafted the training-data
+    and baseline material in this proposal.
+\end{itemize}
+
+Remaining Student A tasks are to add MS-SSIM values from the shared evaluation
+functions to the shared results file, prepare Tecnick, and produce visual
+comparison crops.
 
 \section{Student C Deliverables and Current Status}
 
