@@ -30,24 +30,83 @@
 
 \title{\LARGE Project Proposal \& Literature Review\\[4pt]
        \large Lightweight Learned Image Compression for Laptop-Class Training}
-\author{\todo{Student A} \and Mohamed Abdelazeem \and \todo{Student C}}
+\author{\todo{Student A} \and Mohamed Abdelazeem \and Zeyad Tarek}
 \date{Milestone 1\\CSE681 --- Digital Image Processing}
 
 \begin{document}
 \maketitle
 
 \begin{abstract}
-\todo{Complete this abstract as a team. In 3--5 sentences, state the
-problem, motivation, planned learned-compression approach, dataset,
-and JPEG baseline. Mention that Student C has established the initial
-Kodak/JPEG evaluation pipeline and generated preliminary rate--distortion
-results.}
+This project investigates learned image compression under limited
+computational resources, with the goal of reproducing a compact
+hyperprior-based codec that can be trained within the project period
+on laptop-class hardware. The model will use reduced channel widths
+and latent dimensions, and its rate--distortion performance will be
+evaluated using peak signal-to-noise ratio (PSNR) and multi-scale
+structural similarity (MS-SSIM) as functions of bits per pixel (BPP).
+The evaluation will compare the learned codec with a conventional JPEG
+baseline and published ELIC operating points, while examining how
+reducing model width and latent channel count affects reconstruction
+quality and computational cost. Training will use random $256 \times
+256$ crops from DIV2K, while final image-quality evaluation will use
+the Kodak dataset and, subject to availability and time, Tecnick.
 \end{abstract}
 
 \section{Problem Statement and Motivation}
-\todo{Student A/B: Describe the problem, project scope, motivation,
-and connection to a course topic. Explain why learned image compression
-is worth investigating under laptop-class compute constraints.}
+
+Image compression aims to represent visual data using fewer bits
+while preserving the information and perceptual quality needed for
+reconstruction. Conventional codecs such as JPEG provide practical
+and widely used solutions, but learned image compression offers an
+alternative in which an encoder, a probability model, and a decoder
+are optimized jointly from data. In particular, hyperprior-based
+methods estimate the statistical properties of latent representations
+and use this information to support more efficient entropy coding
+\citep{balle2018scalehyperprior,minnen2018joint}.
+
+Despite their promising rate--distortion performance, learned codecs
+can require substantial computational resources and model capacity.
+Reproducing a large architecture may therefore be impractical within
+a short academic project or on laptop-class hardware. The central
+problem addressed in this work is whether a compact, reduced-width
+hyperprior codec can be trained and evaluated within the available
+time and compute budget, while retaining useful compression
+performance.
+
+The project has four connected objectives. First, it will reproduce
+a compact hyperprior-based learned codec, reducing the channel width
+and latent channel count to make training more manageable. Second,
+it will measure rate--distortion performance using PSNR and MS-SSIM
+against BPP, and compare the results with a JPEG baseline and
+published ELIC operating points. Third, it will investigate the
+trade-off between reconstruction quality and model complexity as
+the network width and latent dimensionality are reduced. Finally,
+it will document practical considerations such as training
+feasibility, model configuration, and decoding cost.
+
+The experimental design is intended to make the comparison
+meaningful rather than simply compare nominal quality settings.
+DIV2K training and validation images will provide the training
+source, with random $256 \times 256$ crops used during training.
+The Kodak dataset, containing 24 images, will serve as the primary
+evaluation benchmark; Tecnick may be added if time and dataset
+availability permit. JPEG will provide a conventional baseline,
+while ELIC will provide a reference to a more recent efficient
+learned-compression approach. Comparisons will be based on measured
+BPP and image-quality metrics, with care taken to distinguish
+reproduced experiments from operating points reported in prior
+publications.
+
+This work connects directly to digital image processing through
+transform-based representation, quantization, entropy coding,
+reconstruction, and objective image-quality assessment. Its
+motivation is not only to obtain a competitive rate--distortion
+curve, but also to understand the engineering trade-offs that arise
+when a learned compression architecture is scaled down for limited
+hardware. A successful outcome will establish a reproducible
+evaluation framework and clarify how much model capacity can be
+reduced before compression quality or practical usability is
+significantly affected.
 
 \section{Related Work}
 \todo{Student A/B: Summarize at least four references, including at least
@@ -291,15 +350,51 @@ evaluation dataset, or comparison with published operating points.}
 
 \section{Risks and Mitigations}
 \begin{itemize}[leftmargin=*]
-    \item \todo{Student A/B: Training may exceed available laptop or
-    Colab compute. State the reduced-width or reduced-crop fallback.}
-    \item \todo{Student B/C: The learned codec may not produce a valid
-    bitstream early enough. State how the team will preserve a working
-    end-to-end evaluation path and report limitations.}
-    \item \todo{Student C: Differences in image preprocessing or metric
-    definitions could make the comparison unfair. Use the same Kodak
-    originals, dimensions, color conventions, and metric implementation
-    for both codecs, and retain per-image results.}
+    \item \textbf{Student A/B -- Training may exceed available compute.}
+    The reduced-width model may still require more memory or training
+    time than the available laptop or Colab session can provide.
+    The team will begin with a small feasibility run and reduce the
+    batch size, crop size, channel width, or number of training steps
+    if necessary. The selected configuration and any resulting
+    limitations will be documented.
+
+    \item \textbf{Student B/C -- The learned codec may not provide a
+    complete bitstream pipeline on schedule.}
+    A model that produces reconstructed tensors but does not yet
+    support actual encoding and decoding cannot be compared fairly
+    using true file-size BPP. The team will prioritize an end-to-end
+    encoder/decoder and record the actual bitstream size. If this
+    remains incomplete, the report will clearly label any estimated
+    rate results and will not present them as measured bitstream BPP.
+
+    \item \textbf{Student C -- Inconsistent evaluation may lead to an
+    unfair comparison.}
+    Differences in image dimensions, color conversion, cropping,
+    metric implementation, or data range can change PSNR and
+    MS-SSIM results. To mitigate this risk, the same original Kodak
+    images and consistent preprocessing and metric definitions will
+    be used for JPEG and the learned codec. The evaluation scripts
+    will retain per-image measurements as well as dataset averages,
+    and the source CSV files will be preserved so that plots can be
+    regenerated and checked.
+
+    \item \textbf{Student C -- Incorrect bitrate accounting.}
+    Using an estimated entropy value instead of the actual compressed
+    file size could misrepresent the achieved compression rate.
+    For JPEG, BPP will be calculated from the saved JPEG file size.
+    For the learned codec, the calculation will use the complete
+    encoded bitstream, including the data required by the decoder.
+    Any difference between estimated and actual rate will be stated.
+
+    \item \textbf{Student C -- Decode-time measurements may be noisy
+    or hardware-dependent.}
+    Runtime can vary with device load, warm-up state, and software
+    configuration. Measurements will therefore be taken on a
+    documented device, after warm-up, over repeated runs. File I/O
+    will be excluded where practical, and the timing method and
+    hardware will be reported. If a consistent timing environment
+    cannot be maintained, decode-time results will be presented as
+    indicative rather than as a definitive hardware comparison.
 \end{itemize}
 
 \section{Work Breakdown}
