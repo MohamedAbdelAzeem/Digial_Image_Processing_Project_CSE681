@@ -160,37 +160,54 @@ images using the same metric definitions.
 \url{https://r0k.us/graphics/kodak/kodak/}
 
 \section{Proposed Method}
-\todo{Student B: Describe the reduced-width hyperprior codec, planned
-width or latent-channel settings, and include an architecture figure
-or pseudocode. Student A: add any relevant data/training details.}
 
-We plan to use a reduced-width learned image compression model based on
-a hyperprior architecture. The encoder transforms an image into a
-smaller latent representation, which is quantized for compression. A
-hyperprior helps estimate the latent values so they can be encoded
-efficiently. The decoder uses the encoded representation to reconstruct
-the image. This design follows the general approach of learned
-hyperprior codecs \citep{balle2018scalehyperprior}, while drawing on
-later work on efficient learned compression \citep{he2022elic}.
+We plan to develop a reduced-width learned image-compression model
+based on the scale-hyperprior approach of
+\citet{balle2018scalehyperprior}. As shown in
+Figure~\ref{fig:codec-architecture}, the encoder transforms an image
+into a latent representation. A hyperprior network produces additional
+information that helps estimate the latent distribution for entropy
+coding. The decoder uses the coded latents and hyperprior information
+to reconstruct the image.
 
-The model will use fewer channels than a standard configuration to
-keep training manageable with our available compute. The exact channel
-widths and training settings will be selected during implementation
-and reported with the experiments. We will compare reconstructed
-images against the originals using the evaluation pipeline described
-above. Where possible, the bitrate will be calculated from the actual
-encoded bitstream rather than an estimated target rate.
+To study the effects of model capacity and target bitrate, we will
+evaluate a small set of channel-width configurations and rate settings.
+For each selected configuration, the training loop will process a
+batch of RGB image crops. The encoder and hyperprior produce quantized
+latents, and the decoder reconstructs each crop. We will train the
+model by minimizing the rate--distortion objective in
+Eq.~\ref{eq:rate-distortion}:
+\begin{equation}
+    \mathcal{L} = R + \lambda D,
+    \label{eq:rate-distortion}
+\end{equation}
+where $R$ is the estimated bitrate in bits per pixel, $D$ is the
+reconstruction distortion, and $\lambda$, hyperparameter which controls the trade-off
+between bitrate and image quality. We will use mean squared error
+(MSE), defined in Eq.~\ref{eq:mse-distortion}, for the distortion
+term:
+\begin{equation}
+    D = \frac{1}{3HW}\sum_{c=1}^{3}\sum_{u=1}^{H}\sum_{v=1}^{W}
+        \left(x_{cuv} - \hat{x}_{cuv}\right)^2,
+    \label{eq:mse-distortion}
+\end{equation}
+where $x$ is the input crop, $\hat{x}$ is its reconstruction, and
+$c$ indexes the three RGB channels. The optimizer will backpropagate
+this loss to update the model weights over repeated batches. We will
+record validation results and save model checkpoints during training.
+The exact widths, rate settings, and training parameters will be
+selected after a feasibility test. The likelihood-based rate is used
+for training; final reported BPP will be calculated from the actual
+encoded bitstream.
 
-Figure~\ref{fig:codec-architecture} shows the planned codec
-architecture. We will use a reduced-width model to make training more
-manageable. The exact channel widths and training settings will be
-chosen during implementation. We will first try training on a laptop
-and use Google Colab if the laptop’s runtime or memory is not
-sufficient.
+After training, each selected model will be evaluated on the same
+Kodak images as the JPEG baseline. We will encode and decode the images
+and compare BPP, PSNR, and MS-SSIM using the evaluation pipeline
+described below. Final BPP will use the actual encoded bitstream size.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.9\linewidth]{figures/architecture.jpg}
+    \includegraphics[width=\linewidth]{figures/architecture.jpg}
     \caption{Planned architecture for the learned image-compression
     codec.}
     \label{fig:codec-architecture}
@@ -205,22 +222,26 @@ compression metrics are used.
 \begin{itemize}[leftmargin=*]
     \item \textbf{Bits per pixel (BPP):}
     BPP measures the average number of encoded bits per image pixel.
-    For a compressed file with size measured in bytes,
-    \[
+    For a compressed file with size measured in bytes, BPP is calculated
+    as shown in Eq.~\ref{eq:bpp}:
+    \begin{equation}
         \mathrm{BPP} =
         \frac{8 \times \text{compressed file size (bytes)}}
              {\text{image width} \times \text{image height}}.
-    \]
+        \label{eq:bpp}
+    \end{equation}
     A lower BPP indicates a smaller encoded representation.
 
     \item \textbf{Peak signal-to-noise ratio (PSNR):}
     PSNR measures pixel-level reconstruction error and is reported
     in decibels (dB). For images represented with a maximum possible
-    pixel value $MAX$, it is calculated from the mean squared error:
-    \[
+    pixel value $MAX$, PSNR is calculated from the MSE as shown in
+    Eq.~\ref{eq:psnr}:
+    \begin{equation}
         \mathrm{PSNR} =
         10\log_{10}\left(\frac{MAX^2}{\mathrm{MSE}}\right).
-    \]
+        \label{eq:psnr}
+    \end{equation}
     Higher PSNR generally indicates lower reconstruction error.
 
     \item \textbf{Multi-scale structural similarity (MS-SSIM):}
@@ -267,7 +288,7 @@ improves reconstruction quality.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.88\linewidth]{figures/jpeg_psnr_bpp.png}
+    \includegraphics[width=0.6\linewidth]{figures/jpeg_psnr_bpp.png}
     \caption{JPEG rate--distortion curve using average PSNR on the Kodak dataset.}
     \label{fig:jpeg-psnr}
 \end{figure}
@@ -281,7 +302,7 @@ more bits are allocated.
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.88\linewidth]{figures/jpeg_msssim_bpp.png}
+    \includegraphics[width=0.6\linewidth]{figures/jpeg_msssim_bpp.png}
     \caption{Average JPEG MS-SSIM versus BPP on the Kodak dataset.}
     \label{fig:jpeg-msssim}
 \end{figure}
@@ -293,7 +314,7 @@ available.
 
 \subsection{Evaluation Implementation}
 
-The evaluation pipeline is implemented in Python in Google Colab.
+The evaluation pipeline is implemented in Python.
 The main libraries used are:
 \begin{itemize}[leftmargin=*]
     \item \textbf{Pillow (PIL):} JPEG compression and image decoding.
@@ -319,22 +340,33 @@ for the learned compression model and helps maintain a consistent
 comparison between JPEG and the learned codec.
 
 \section{Feasibility and Compute Plan}
-\todo{Student B: State the compute tier, training setup, expected
-experiment time, and result of the one-training-step feasibility test.
-Student A/B: describe training hardware and memory constraints.}
+
+The model will be implemented using the CompressAI
+\texttt{bmshj2018-hyperprior} architecture, which corresponds to the
+scale-hyperprior method. In CompressAI 1.2.8, quality levels 1--5 use
+$N=128$ hyperprior channels and $M=192$ latent channels; levels 6--8
+use $N=192$ and $M=320$. These are standard model configurations and
+quality presets. We will use the standard configuration as a reference
+and test a limited number of reduced-width configurations, with the
+number of experiments depending on available compute. For each
+configuration, the rate--distortion setting, including the distortion
+metric and $\lambda$, will be recorded. Reduced-width models will be
+trained for this project rather than treated as pretrained standard
+CompressAI models.
 
 We will begin by trying to train the model on a laptop. If the required
-runtime or memory is not practical, we will use Google Colab when
+runtime or memory is not enough, we will use Google Colab when
 available. The available hardware may vary, so we will record the
-device used for each experiment.
+device, model configuration, image crop size, batch size, and training
+time for each experiment.
 
-Before starting a longer run, we will perform a short feasibility test
-using one training step. We will record whether the step completes,
-its runtime, and any memory or configuration limits. This test has not
-yet been completed, so we cannot provide a measured runtime or training
-estimate at this stage. We will use the test results to choose the
-model width, image crop size, and batch size. If needed, we will reduce
-these settings to make training feasible.
+Before beginning a full training run, we will first check that one
+training step completes, then run a short pilot to measure average
+step time and peak memory use. We have not completed these tests yet,
+so we cannot estimate the full training time. We will use the pilot
+results to select a feasible model width, crop size, and batch size,
+and adjust them if needed. During training, we will monitor progress
+and save checkpoints for evaluation.
 
 
 \subsection{Minimum Viable Deliverable}
