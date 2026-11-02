@@ -62,7 +62,7 @@ alternative in which an encoder, a probability model, and a decoder
 are optimized jointly from data. In particular, hyperprior-based
 methods estimate the statistical properties of latent representations
 and use this information to support more efficient entropy coding
-\citep{balle2018scalehyperprior,minnen2018joint}.
+\citep{balle2018scalehyperprior}.
 
 Despite their promising rate--distortion performance, learned codecs
 can require substantial computational resources and model capacity.
@@ -113,6 +113,18 @@ significantly affected.
 two from 2023--2026. Explain how the work informs this project. Keep
 the bibliography entries in the shared references.bib file.}
 
+Ballé et al. introduce a scale-hyperprior model for learned image compression, which serves as a foundational approach for our work \citep{balle2018scalehyperprior}.
+
+Jiang et al. propose MLIC, which uses channel and spatial context to
+better estimate latent probabilities and reduce coding rate
+\citep{jiang2023mlic}. This can be investigated as a potential
+improvement to our model.
+
+Luo et al. propose ERHP to prune redundant capacity in a codec's
+hyperprior module. They report reducing total model parameters by at
+least 22.6\% while improving rate--distortion performance
+\citep{luo2022erhp}. This will be a reference for understanding model pruning and efficiency considerations.
+
 \begin{table}[htbp]
 \centering
 \caption{Key references and their relevance to this project.}
@@ -122,10 +134,10 @@ the bibliography entries in the shared references.bib file.}
 \midrule
 \citep{balle2018scalehyperprior} & 2018 &
 Scale-hyperprior learned image codec. \\
-\citep{minnen2018joint} & 2018 &
-Joint autoregressive and hierarchical priors for learned image compression. \\
-\citep{he2022elic} & 2022 &
-Efficient learned image compression architecture. \\
+\citep{luo2022erhp} & 2022 &
+Pruning redundant capacity in the hyperprior module. \\
+\citep{jiang2023mlic} & 2023 &
+Multi-reference entropy model combining channel and spatial context. \\
 \todo{Recent reference} & \todo{Year} & \todo{Relevance} \\
 \todo{Recent reference} & \todo{Year} & \todo{Relevance} \\
 \bottomrule
