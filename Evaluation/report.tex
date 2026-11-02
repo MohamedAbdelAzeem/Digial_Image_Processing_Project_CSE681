@@ -105,6 +105,23 @@ images using the same metric definitions.
 width or latent-channel settings, and include an architecture figure
 or pseudocode. Student A: add any relevant data/training details.}
 
+We plan to use a reduced-width learned image compression model based on
+a hyperprior architecture. The encoder transforms an image into a
+smaller latent representation, which is quantized for compression. A
+hyperprior helps estimate the latent values so they can be encoded
+efficiently. The decoder uses the encoded representation to reconstruct
+the image. This design follows the general approach of learned
+hyperprior codecs \citep{balle2018scalehyperprior}, while drawing on
+later work on efficient learned compression \citep{he2022elic}.
+
+The model will use fewer channels than a standard configuration to
+keep training manageable with our available compute. The exact channel
+widths and training settings will be selected during implementation
+and reported with the experiments. We will compare reconstructed
+images against the originals using the evaluation pipeline described
+above. Where possible, the bitrate will be calculated from the actual
+encoded bitstream rather than an estimated target rate.
+
 \section{Evaluation Plan}
 
 The evaluation is designed to compare compression rate, reconstructed
@@ -231,6 +248,20 @@ comparison between JPEG and the learned codec.
 \todo{Student B: State the compute tier, training setup, expected
 experiment time, and result of the one-training-step feasibility test.
 Student A/B: describe training hardware and memory constraints.}
+
+We will begin by trying to train the model on a laptop. If the required
+runtime or memory is not practical, we will use Google Colab when
+available. The available hardware may vary, so we will record the
+device used for each experiment.
+
+Before starting a longer run, we will perform a short feasibility test
+using one training step. We will record whether the step completes,
+its runtime, and any memory or configuration limits. This test has not
+yet been completed, so we cannot provide a measured runtime or training
+estimate at this stage. We will use the test results to choose the
+model width, image crop size, and batch size. If needed, we will reduce
+these settings to make training feasible.
+
 
 \subsection{Minimum Viable Deliverable}
 \todo{As a team, state the smallest working experiment that produces
