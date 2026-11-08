@@ -2,3 +2,10 @@ data/raw/
 __pycache__/
 .pytest_cache/
 .venv/
+.vscode/
+report.log
+report.out
+report.blg
+report.aux
+report.bbl
+/data/*
