@@ -2,6 +2,23 @@
 
 ## W1: Download and verify
 
+From the repository root, download and verify all three datasets automatically:
+
+```powershell
+python -m data.download_data
+```
+
+The files are placed in `data/raw/` by default, or in the folder configured by
+`DIP_DATA_ROOT`. To choose a folder for one run, pass it directly:
+
+```powershell
+python -m data.download_data --data-root "D:\datasets\dip"
+```
+
+The downloader fetches the official DIV2K train/validation archives and the 24
+Kodak PNG images, extracts them into the layout below, and verifies the images.
+It removes each DIV2K ZIP after successful extraction to save disk space.
+
 Each student downloads the datasets on their own laptop into one folder (the
 *data root*) with this layout:
 
