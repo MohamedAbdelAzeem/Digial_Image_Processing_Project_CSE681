@@ -9,13 +9,14 @@ import torch
 from PIL import Image
 from torch.utils.data import DataLoader
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from data.dataset import DIV2KDataset  # noqa: E402
 
 pytest.importorskip("compressai")
 from compressai.losses import RateDistortionLoss  # noqa: E402
-from compressai.models import ScaleHyperprior  # noqa: E402
+from models.hyperprior import build_scale_hyperprior  # noqa: E402
+from training.engine import train_one_step  # noqa: E402
 
 
 @pytest.fixture
@@ -32,34 +33,24 @@ def batch(tmp_path):
 @pytest.fixture
 def model():
     # Small N/M keeps the test fast; the architecture is the same as the notebook's model.
-    return ScaleHyperprior(N=32, M=48)
+    return build_scale_hyperprior(num_channels=32, latent_channels=48)
 
 
 def test_one_training_step(batch, model):
+    assert model.N == 32
+    assert model.M == 48
     main_params = [p for n, p in model.named_parameters() if not n.endswith(".quantiles")]
     aux_params = [p for n, p in model.named_parameters() if n.endswith(".quantiles")]
     optimizer = torch.optim.Adam(main_params, lr=1e-4)
     aux_optimizer = torch.optim.Adam(aux_params, lr=1e-3)
     criterion = RateDistortionLoss(lmbda=0.0067)
 
-    model.train()
-    output = model(batch)
-    assert output["x_hat"].shape == batch.shape
-
-    losses = criterion(output, batch)
-    assert all(torch.isfinite(losses[k]) for k in ("loss", "bpp_loss", "mse_loss"))
-
     weight_before = model.g_a[0].weight.detach().clone()
-    optimizer.zero_grad()
-    losses["loss"].backward()
-    optimizer.step()
-    assert not torch.equal(model.g_a[0].weight, weight_before)
+    result = train_one_step(model, batch, optimizer, aux_optimizer, criterion)
 
-    aux_optimizer.zero_grad()
-    aux_loss = model.aux_loss()
-    aux_loss.backward()
-    aux_optimizer.step()
-    assert torch.isfinite(aux_loss)
+    assert result["x_hat"].shape == batch.shape
+    assert all(torch.isfinite(result[key]) for key in ("loss", "bpp_loss", "mse_loss", "aux_loss"))
+    assert not torch.equal(model.g_a[0].weight, weight_before)
 
 
 def test_compress_decompress_roundtrip(batch, model):
