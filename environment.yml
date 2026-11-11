@@ -9,6 +9,8 @@ dependencies:
   - scikit-image
   - pytorch
   - torchvision
+  - pillow
+  - pytest
   - jupyterlab
   - pip
   - pip:

@@ -10,6 +10,9 @@ from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from data.paths import RAW_DATA_ROOT
 from data.verify_data import inspect_folder
 

@@ -1,12 +1,34 @@
+import subprocess
 import sys
 import zipfile
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from data import download_data  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    "working_directory, arguments",
+    [
+        (".", ["src/data/download_data.py"]),
+        ("src", ["-m", "data.download_data"]),
+    ],
+)
+def test_downloader_help(working_directory, arguments):
+    repository = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [sys.executable, "-E", *arguments, "--help"],
+        cwd=repository / working_directory,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "--data-root" in result.stdout
 
 
 def test_div2k_split_is_extracted_and_existing_data_is_skipped(tmp_path, monkeypatch):

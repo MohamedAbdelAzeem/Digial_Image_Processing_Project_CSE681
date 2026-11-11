@@ -4,6 +4,8 @@ Lightweight Learned Image Compression for Laptop-Class Training.
 
 ## Create the project environment
 
+All project dependencies are defined in `environment.yml`.
+
 Install [Miniforge](https://github.com/conda-forge/miniforge) or another Conda
 distribution, then open Anaconda Prompt or PowerShell in this repository and run:
 
@@ -16,10 +18,21 @@ If you already created this environment using an older version of the YAML file,
 update it to match the current dependencies:
 
 ```powershell
-conda env update -f environment.yml --prune
+conda env update -n dip-project1 -f environment.yml --prune
+conda activate dip-project1
 ```
 
-## Render the M1 report template
+## Download the datasets
+
+From the repository root with `dip-project1` active, run the downloader as a module
+from `src` so Python can resolve its `data` package:
+
+```powershell
+cd src
+python -m data.download_data --data-root "D:/datasets/dip"
+```
+
+## Render the report template
 
 Following the course guide, install [TeX Live](https://www.tug.org/texlive/)
 separately from Conda. Include the LaTeX packages used by the template, such as
@@ -51,8 +64,5 @@ Alternatively, upload `report.tex` and `references.bib` to
 
 ## Project code dependencies
 
-All project dependencies are defined in `environment.yml`. Conda installs the core
-packages and then installs the notebook dependencies, including CompressAI, through
-the YAML file's `pip` section. CompressAI's native extension may require a compatible
 C++ build toolchain on Windows; see the
 [CompressAI installation instructions](https://interdigitalinc.github.io/CompressAI/installation.html).
