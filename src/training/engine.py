@@ -6,6 +6,35 @@ from compressai.models import ScaleHyperprior
 from torch import Tensor
 from torch.optim import Optimizer
 
+from settings import ExperimentSettings
+
+
+def build_training_components(
+    model: ScaleHyperprior,
+    settings: ExperimentSettings,
+) -> tuple[Optimizer, Optimizer, RateDistortionLoss]:
+    """Create the main/auxiliary optimizers and rate-distortion criterion."""
+    if model.N != settings.num_channels or model.M != settings.latent_channels:
+        raise ValueError("Model channel counts do not match experiment settings")
+
+    main_parameters = [
+        parameter
+        for name, parameter in model.named_parameters()
+        if not name.endswith(".quantiles")
+    ]
+    aux_parameters = [
+        parameter
+        for name, parameter in model.named_parameters()
+        if name.endswith(".quantiles")
+    ]
+    if not main_parameters or not aux_parameters:
+        raise ValueError("Model must provide main parameters and entropy quantiles")
+
+    optimizer = torch.optim.Adam(main_parameters, lr=settings.learning_rate)
+    aux_optimizer = torch.optim.Adam(aux_parameters, lr=settings.aux_learning_rate)
+    criterion = RateDistortionLoss(lmbda=settings.lmbda)
+    return optimizer, aux_optimizer, criterion
+
 
 def train_one_step(
     model: ScaleHyperprior,
