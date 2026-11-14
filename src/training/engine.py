@@ -18,6 +18,12 @@ from data.dataset import DIV2KDataset
 from data.paths import DIV2K_DIR, DIV2K_VALID_DIR
 from models.hyperprior import build_scale_hyperprior
 from settings import ExperimentSettings
+from training.checkpoint import (
+    collect_provenance,
+    load_checkpoint,
+    restore_checkpoint,
+    save_checkpoint,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +125,15 @@ def train(
     valid_dir: str | Path = DIV2K_VALID_DIR,
     *,
     log_interval: int = 10,
+    checkpoint_path: str | Path | None = None,
+    resume_from: str | Path | None = None,
 ) -> tuple[ScaleHyperprior, list[dict[str, float]]]:
-    """Train from scratch until a step or epoch limit, validating after each epoch."""
+    """Train from scratch until a step or epoch limit, validating after each epoch.
+
+    `checkpoint_path` receives the latest state after every epoch. `resume_from` continues from
+    such a file at the next epoch; the limits count from the start of the whole run. A resumed
+    run matches an uninterrupted one exactly only on the CPU with `num_workers=0`.
+    """
     train_dir = Path(train_dir).resolve()
     valid_dir = Path(valid_dir).resolve()
     if train_dir.is_relative_to(valid_dir) or valid_dir.is_relative_to(train_dir):
@@ -147,11 +160,12 @@ def train(
         "persistent_workers": settings.num_workers > 0, # Keep worker processes alive across epochs if using multiple workers.
         "pin_memory": device.type == "cuda", # Copy tensors into pinned memory before transferring to CUDA for faster host-to-device transfer.  
     }
+    train_generator = torch.Generator().manual_seed(settings.seed)
     train_loader = DataLoader(
         DIV2KDataset(train_dir, crop_size=settings.crop_size),
         shuffle=True,
         # Its own generator keeps data order unchanged when only model widths change.
-        generator=torch.Generator().manual_seed(settings.seed),
+        generator=train_generator,
         **loader_options,
     )
     valid_loader = DataLoader(
@@ -179,10 +193,31 @@ def train(
     if device.type == "cuda":
         logger.info("Device: %s", torch.cuda.get_device_name(device))
 
-    epochs = itertools.count(1) if settings.max_epochs is None else range(1, settings.max_epochs + 1)
-    history = []
-    step = 0
-    start = time.perf_counter()
+    last_epoch, step, history = 0, 0, []
+    if resume_from is not None:
+        last_epoch, step, history = restore_checkpoint(
+            load_checkpoint(resume_from),
+            model=model,
+            optimizer=optimizer,
+            aux_optimizer=aux_optimizer,
+            settings=settings,
+            train_generator=train_generator,
+        )
+        logger.info("Resumed from %s after epoch %d, step %d", resume_from, last_epoch, step)
+        if settings.max_steps is not None and step >= settings.max_steps:
+            return model, history
+    provenance = (
+        collect_provenance(train_dir, valid_dir) if checkpoint_path is not None else None
+    )
+
+    if settings.max_epochs is None:
+        epochs = itertools.count(last_epoch + 1)
+    else:
+        epochs = range(last_epoch + 1, settings.max_epochs + 1)
+
+# ======================== Training Loop =========================
+    # Elapsed time continues from the checkpointed run.
+    start = time.perf_counter() - (history[-1]["elapsed_s"] if history else 0.0)
     for epoch in epochs:
         totals = dict.fromkeys(TRAIN_METRICS, 0.0)
         epoch_steps = 0
@@ -219,6 +254,21 @@ def train(
             "elapsed=%(elapsed_s).1fs",
             record,
         )
+
+        # Save a checkpoint after each epoch if a path is provided.
+        if checkpoint_path is not None:
+            save_checkpoint(
+                checkpoint_path,
+                model=model,
+                optimizer=optimizer,
+                aux_optimizer=aux_optimizer,
+                settings=settings,
+                epoch=epoch,
+                step=step,
+                history=history,
+                train_generator=train_generator,
+                provenance=provenance,
+            )
         if step == settings.max_steps:
             break
 

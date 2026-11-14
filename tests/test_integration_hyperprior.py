@@ -19,6 +19,11 @@ from data.dataset import DIV2KDataset  # noqa: E402
 pytest.importorskip("compressai")
 from models.hyperprior import build_scale_hyperprior  # noqa: E402
 from settings import ExperimentSettings  # noqa: E402
+from training.checkpoint import (  # noqa: E402
+    load_checkpoint,
+    restore_checkpoint,
+    save_checkpoint,
+)
 from training.engine import (  # noqa: E402
     build_training_components,
     train,
@@ -343,3 +348,161 @@ def test_cuda_request_without_cuda_fails_clearly(image_dirs, tiny_settings, monk
     settings = dataclasses.replace(tiny_settings, device="cuda")
     with pytest.raises(RuntimeError, match="CUDA is not available"):
         train(settings, *image_dirs)
+
+
+def assert_same_state(first, second):
+    if isinstance(first, torch.Tensor):
+        assert torch.equal(first, second)
+    elif isinstance(first, dict):
+        assert first.keys() == second.keys()
+        for key in first:
+            assert_same_state(first[key], second[key])
+    elif isinstance(first, (list, tuple)):
+        assert len(first) == len(second)
+        for first_item, second_item in zip(first, second):
+            assert_same_state(first_item, second_item)
+    else:
+        assert first == second
+
+
+def test_checkpoint_roundtrip_restores_training_state(image_dirs, tiny_settings, tmp_path):
+    """Objective: a saved checkpoint restores model, both optimizers, counters and RNG states.
+
+    Steps:
+      1. Take two training steps so the Adam optimizers hold state, then save a checkpoint.
+      2. Draw one random number from Python and one from PyTorch.
+      3. Build a differently initialized model and optimizers, disturb the RNGs, and restore.
+
+    Expected: restore returns (epoch, step, history); model weights, optimizer states and the
+    shuffle generator equal the saved ones; the next Python and PyTorch draws match step 2.
+    """
+
+    def build(seed):
+        torch.manual_seed(seed)
+        model = build_scale_hyperprior(settings=tiny_settings)
+        return model, *build_training_components(model, tiny_settings)
+
+    model, optimizer, aux_optimizer, criterion = build(1)
+    generator = torch.Generator().manual_seed(5)
+    batch = next(iter(DataLoader(DIV2KDataset(image_dirs[0], crop_size=64), batch_size=2)))
+    for _ in range(2):
+        train_one_step(model, batch, optimizer, aux_optimizer, criterion)
+    history = [{"epoch": 1, "step": 2, "elapsed_s": 0.5}]
+    path = tmp_path / "run.pt"
+    save_checkpoint(
+        path,
+        model=model,
+        optimizer=optimizer,
+        aux_optimizer=aux_optimizer,
+        settings=tiny_settings,
+        epoch=1,
+        step=2,
+        history=history,
+        train_generator=generator,
+        provenance=None,
+    )
+    expected_python, expected_torch = random.random(), torch.rand(1)
+
+    restored, restored_optimizer, restored_aux_optimizer, _ = build(2)
+    restored_generator = torch.Generator().manual_seed(99)
+    random.seed(7)
+    torch.manual_seed(7)
+    result = restore_checkpoint(
+        load_checkpoint(path),
+        model=restored,
+        optimizer=restored_optimizer,
+        aux_optimizer=restored_aux_optimizer,
+        settings=tiny_settings,
+        train_generator=restored_generator,
+    )
+
+    assert result == (1, 2, history)
+    assert_same_state(model.state_dict(), restored.state_dict())
+    assert_same_state(optimizer.state_dict(), restored_optimizer.state_dict())
+    assert_same_state(aux_optimizer.state_dict(), restored_aux_optimizer.state_dict())
+    assert torch.equal(generator.get_state(), restored_generator.get_state())
+    assert random.random() == expected_python
+    assert torch.equal(torch.rand(1), expected_torch)
+
+
+def test_resumed_run_matches_uninterrupted_run(image_dirs, tiny_settings, tmp_path):
+    """Objective: stopping after an epoch and resuming gives the same result as not stopping.
+
+    Steps: train 2 epochs in one run; separately train 1 epoch with `checkpoint_path`, then
+    resume from that file with the 2-epoch limit.
+
+    Expected: identical per-epoch history (ignoring elapsed time) and bitwise-identical weights
+    (CPU, `num_workers=0`). This only holds if the optimizer and RNG states were restored too.
+    """
+    full = dataclasses.replace(tiny_settings, max_steps=None, max_epochs=2)
+    full_model, full_history = train(full, *image_dirs)
+    checkpoint = tmp_path / "run.pt"
+    train(dataclasses.replace(full, max_epochs=1), *image_dirs, checkpoint_path=checkpoint)
+
+    resumed_model, resumed_history = train(full, *image_dirs, resume_from=checkpoint)
+
+    for record in full_history + resumed_history:
+        del record["elapsed_s"]
+    assert resumed_history == full_history
+    assert_same_state(full_model.state_dict(), resumed_model.state_dict())
+
+
+def test_resume_rejects_changed_experiment_settings(image_dirs, tiny_settings, tmp_path):
+    """Objective: a checkpoint cannot continue under a different experiment.
+
+    Steps: save a checkpoint, then resume with a different `lmbda`.
+
+    Expected: `ValueError` naming `lmbda`. Limits, workers and device may change.
+    """
+    checkpoint = tmp_path / "run.pt"
+    train(tiny_settings, *image_dirs, checkpoint_path=checkpoint)
+
+    with pytest.raises(ValueError, match="lmbda"):
+        train(
+            dataclasses.replace(tiny_settings, lmbda=0.01), *image_dirs, resume_from=checkpoint
+        )
+
+
+def test_resume_after_finished_budget_trains_no_further(image_dirs, tiny_settings, tmp_path):
+    """Objective: resuming a run whose step limit is already reached does no extra training.
+
+    Steps: train to `max_steps=3` (stopping mid-epoch) with a checkpoint, then resume with the
+    same settings.
+
+    Expected: the returned history and weights equal the checkpoint's.
+    """
+    checkpoint = tmp_path / "run.pt"
+    train(tiny_settings, *image_dirs, checkpoint_path=checkpoint)
+    saved = load_checkpoint(checkpoint)
+
+    model, history = train(tiny_settings, *image_dirs, resume_from=checkpoint)
+
+    assert saved["step"] == 3
+    assert history == saved["history"]
+    assert_same_state(model.state_dict(), saved["model"])
+
+
+def test_checkpoint_records_settings_and_provenance(image_dirs, tiny_settings, tmp_path):
+    """Objective: a checkpoint identifies the run that produced it.
+
+    Steps: train one epoch with `checkpoint_path` and load the file.
+
+    Expected: it holds the resolved settings, epoch 1 at step 2, software versions, a data
+    fingerprint (image count and SHA-256) for each folder, and no leftover temporary file.
+    """
+    settings = dataclasses.replace(tiny_settings, max_steps=None, max_epochs=1)
+    path = tmp_path / "run.pt"
+    train(settings, *image_dirs, checkpoint_path=path)
+
+    checkpoint = load_checkpoint(path)
+
+    assert checkpoint["settings"] == dataclasses.asdict(settings)
+    assert (checkpoint["epoch"], checkpoint["step"]) == (1, 2)
+    provenance = checkpoint["provenance"]
+    assert provenance["torch"] == torch.__version__
+    assert "git" in provenance
+    assert provenance["train_data"]["image_count"] == 4
+    assert provenance["valid_data"]["image_count"] == 3
+    assert len(provenance["train_data"]["sha256"]) == 64
+    assert provenance["train_data"] != provenance["valid_data"]
+    assert not path.with_name("run.pt.tmp").exists()
