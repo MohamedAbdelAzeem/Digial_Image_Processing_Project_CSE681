@@ -1,117 +1,125 @@
-# Proposed Project Structure
+# Project Structure
 
-This is a **target layout for organizing the project**, not an inventory of files that all exist today. It avoids a separate installable `lic` package for now, while keeping source code grouped by responsibility. Run project commands from the repository root with the project environment active.
+Target layout with the current status of each item (checked 2026-11-15). Planned items are described in the Student B plan (`.github/STUDENT_B_DEVELOPMENT_PLAN.md`) or belong to the evaluation work. Run project commands from the repository root with the `dip-project1` environment active. There is no installable package; `src` is added to the import path by the tests.
+
+## Repository layout
+
+Status tags: `[exists]` is in the repository; `[planned: ...]` is not implemented yet, with the stage that introduces it.
 
 ```text
 Digial_Image_Processing_Project_CSE681/
-├── README.md                         # Setup, data download, and common commands
-├── environment.yml                   # Conda environment and project dependencies
-├── .gitignore                        # Excludes local datasets and generated artifacts
+├── README.md                       # [exists] Setup, data download, common commands
+├── AGENTS.md                       # [exists] Instructions for AI coding agents
+├── PROJECT_STRUCTURE.md            # [exists] This file
+├── environment.yml                 # [exists] Conda environment and dependencies
+├── .gitignore                      # [exists] Excludes datasets, runs, results, build artifacts
+├── report.tex                      # [exists] Report source
+├── references.bib                  # [exists] Bibliography
 │
-├── configs/                          # Reproducible training/evaluation settings
-│   ├── base.yaml                     # Shared defaults and dataset locations
-│   ├── smoke_test.yaml               # Tiny feasibility run
-│   └── experiments/                  # One-change-at-a-time model experiments
-│       ├── small.yaml                # Compact reference model
-│       ├── narrow.yaml               # Reduced transform width
-│       └── small_latent.yaml         # Reduced latent channel count
+├── .github/
+│   └── STUDENT_B_DEVELOPMENT_PLAN.md   # [exists] Staged plan for the training path
 │
-├── src/                              # Reusable project implementation
-│   ├── data/                         # Dataset paths, acquisition, validation, loaders
-│   │   ├── paths.py                  # Resolve data root and dataset locations
-│   │   ├── download_data.py          # Download datasets and resume/retry safely
-│   │   ├── verify_data.py            # Check image integrity and expected dataset layout
-│   │   └── datasets.py               # Training crops and full-resolution evaluation images
+├── configs/                        # [planned: Stage 5] Reproducible experiment settings
+│   ├── base.yaml                   #   Shared defaults
+│   ├── smoke_test.yaml             #   Tiny feasibility run
+│   └── experiments/                #   One-change-at-a-time model variants
+│       ├── small.yaml              #   [planned: Stage 5/6] Compact reference model
+│       ├── narrow.yaml             #   [planned: Stage 6] Reduced transform width N only
+│       └── small_latent.yaml       #   [planned: Stage 6] Reduced latent channels M only
+│
+├── src/                            # Reusable project implementation
+│   ├── settings.py                 # [exists] Validated ExperimentSettings
 │   │
-│   ├── models/                       # Learned codec architectures
-│   │   └── hyperprior.py             # Construct compact and pretrained scale hyperpriors
+│   ├── data/
+│   │   ├── paths.py                # [exists] Resolve data root and dataset folders
+│   │   ├── download_data.py        # [exists] Download DIV2K and Kodak
+│   │   ├── verify_data.py          # [exists] Check image integrity and layout
+│   │   ├── dataset.py              # [exists] Training crops and validation center crops
+│   │   ├── jpeg_baseline.py        # [exists] JPEG quality sweep (lives in data/ for now)
+│   │   └── README.md               # [exists] Data module usage
 │   │
-│   ├── training/                     # Training lifecycle
-│   │   ├── engine.py                 # Training and validation loops
-│   │   └── checkpoint.py             # Save, restore, and resume model/optimizer state
+│   ├── models/
+│   │   └── hyperprior.py           # [exists] Scratch ScaleHyperprior from settings (no pretrained loading)
 │   │
-│   ├── codec/                        # Learned codec inference and file representation
-│   │   ├── inference.py              # Encode/decode orchestration and padding
-│   │   └── bitstream.py              # Store streams and decoder-required metadata
+│   ├── training/
+│   │   ├── engine.py               # [exists] Training step, validation, train() loop
+│   │   └── checkpoint.py           # [exists] Save, restore, resume with provenance
 │   │
-│   ├── baselines/                    # Conventional comparison codecs
-│   │   └── jpeg.py                   # Pillow JPEG encode/decode quality sweep
+│   ├── codec/                      # [planned: evaluation] Learned codec inference
+│   │   ├── inference.py            #   Encode/decode orchestration and padding
+│   │   └── bitstream.py            #   Store all streams and decoder metadata
 │   │
-│   ├── evaluation/                   # Shared metrics and benchmark protocol
-│   │   ├── metrics.py                # PSNR, MS-SSIM, and actual-byte BPP
-│   │   ├── benchmark.py              # Per-image dataset evaluation and CSV output
-│   │   ├── timing.py                 # Repeatable timing measurements
-│   │   └── analysis.py                # Rate-distortion, matched-rate, and complexity analysis
+│   ├── evaluation/                 # [planned: evaluation] Shared metrics and benchmark protocol
+│   │   ├── metrics.py              #   PSNR, MS-SSIM, actual-byte BPP
+│   │   ├── benchmark.py            #   Per-image evaluation and CSV output
+│   │   ├── timing.py               #   Repeatable timing measurements
+│   │   └── analysis.py             #   Rate-distortion and complexity analysis
 │   │
-│   ├── reporting/                    # Results prepared for inspection and the paper
-│   │   └── report.py                 # Plots, summary tables, and LaTeX table output
-│   │
-│   └── utils/                        # Cross-cutting experiment helpers
-│       ├── config.py                 # Load, merge, and validate YAML settings
-│       └── reproducibility.py         # Seeds and run/environment provenance
+│   └── reporting/
+│       └── report.py               # [planned: evaluation] Plots and LaTeX tables
 │
-├── scripts/                          # Command-line entry points; keep these thin
-│   ├── train.py                      # Start or resume a configured training run
-│   ├── evaluate.py                   # Evaluate a learned checkpoint on a test set
-│   ├── benchmark_jpeg.py             # Run the JPEG baseline
-│   ├── compress.py                   # Compress an input image
-│   ├── decompress.py                 # Reconstruct an image from a bitstream
-│   └── report.py                     # Generate plots and report-ready tables
+├── scripts/                        # [planned] Thin command-line entry points
+│   ├── train.py                    #   [planned: Stage 5] Start or resume a configured run
+│   └── evaluate.py                 #   [planned: evaluation] Evaluate a checkpoint on a test set
 │
-├── tests/                            # Fast automated checks; default tests use synthetic data
-│   ├── conftest.py                   # Shared fixtures and synthetic images
-│   ├── test_data.py                  # Dataset, crop, and verification behavior
-│   ├── test_training.py              # Loss and short training-step behavior
-│   ├── test_codec.py                 # Encode/decode and dimension restoration
-│   ├── test_metrics.py               # Metric and BPP calculations
-│   └── test_jpeg.py                  # JPEG roundtrip and measured file sizes
+├── tests/                          # [exists] Fast checks; default tests use synthetic data
+│   ├── README.md
+│   ├── test_dataset.py
+│   ├── test_download_data.py
+│   ├── test_integration_hyperprior.py
+│   └── test_jpeg_baseline.py
 │
-├── notebooks/                        # Guided learning and result exploration
-│   ├── data_and_crops.ipynb          # Inspect datasets and training crops
-│   ├── hyperprior_experiments.ipynb  # Explain model, training, and inference experiments
-│   └── inspect_results.ipynb         # Explore saved CSVs and figures
+├── notebooks/                      # [exists]
+│   ├── models/
+│   │   └── scale_hyperprior_one_training_step.ipynb
+│   └── Evaluation/
+│       └── Student_C_JPEG_Baseline_Annotated (1).ipynb
 │
-├── references/                       # External comparison data and its provenance
-│   ├── elic_points.csv               # Published ELIC rates/metrics with source details
-│   └── README.md                     # Dataset, figure/table, and citation notes
+├── references/
+│   └── elic_points.csv             # [planned: evaluation] Published ELIC rates with source details
 │
-├── paper/                            # Report source and committed publication figures
-│   ├── report.tex                    # Project report
-│   ├── references.bib                # Bibliography
-│   └── figures/                      # Selected report figures
+├── runs/                           # [planned: Stage 5] Generated; ignored by Git
+│   └── <experiment_id>/
+│       ├── config.yaml             #   Resolved settings
+│       ├── provenance.json         #   Code, environment, seed, data fingerprint
+│       ├── checkpoints/            #   Latest and best training states
+│       └── logs/                   #   Training and validation history, console log
 │
-├── data/                             # Local source data; never commit image datasets
-│   ├── div2k/
-│   │   ├── train/                    # DIV2K training images
-│   │   └── val/                      # Held-out DIV2K validation images
-│   ├── kodak/                        # Kodak test images; evaluation only
-│   └── tecnick/                      # Tecnick test images; evaluation only
-│
-├── runs/                             # Generated training artifacts; ignored by Git
-│   └── experiment_id/
-│       ├── config.yaml               # Resolved settings used by this run
-│       ├── provenance.json           # Code revision, environment, seed, and data manifest
-│       ├── checkpoints/              # Best and resumable training states
-│       └── logs/                     # Training/validation history and console log
-│
-└── results/                          # Generated evaluation artifacts; ignored by Git
-    └── benchmark_id/
-        ├── provenance.json           # Checkpoint, dataset, protocol, and environment
-        ├── per_image.csv             # Individual image measurements
-        ├── summary.csv               # Dataset-level aggregate metrics
-        ├── figures/                  # Rate-distortion and timing plots
-        └── reconstructions/          # Optional decoded images and comparison crops
+└── results/                        # [planned: evaluation] Generated; ignored by Git
+    └── <benchmark_id>/
+        ├── per_image.csv
+        ├── summary.csv
+        ├── figures/
+        └── provenance.json
 ```
 
-## Command Convention
+## Data
 
-For the proposed command-line scripts, run from the repository root so imports use the `src` namespace without installing a package:
+Datasets live outside Git under `DIP_DATA_ROOT` (default `src/data/raw`), in the flat layout that `src/data/paths.py` expects:
+
+```text
+<DIP_DATA_ROOT>/
+├── DIV2K_train_HR/                 # [exists] Training images (800)
+├── DIV2K_valid_HR/                 # [exists] Validation and model selection (100)
+├── kodak/                          # [exists] Final evaluation only
+└── tecnick/                        # [planned] Final evaluation only; not yet in paths.py or download_data.py
+```
+
+Never use Kodak or Tecnick for training or model selection. Keep the layout consistent with `src/data/paths.py` and `src/data/download_data.py`.
+
+## Commands
+
+Available now:
+
+```powershell
+python -m pytest tests -q
+cd src
+python -m data.download_data --data-root "D:/datasets/dip"
+```
+
+Planned (Stage 5; update to the real arguments when implemented):
 
 ```powershell
 python -m scripts.train --config configs/smoke_test.yaml
-python -m scripts.evaluate --checkpoint runs/experiment_id/checkpoints/best.pth --dataset kodak
-python -m scripts.compress --checkpoint runs/experiment_id/checkpoints/best.pth --input image.png --output image.bin
-python -m scripts.decompress --checkpoint runs/experiment_id/checkpoints/best.pth --input image.bin --output reconstruction.png
+python -m scripts.evaluate --checkpoint runs/experiment_id/checkpoints/best.pt --dataset kodak
 ```
-
-These are target interfaces; update them to match the actual command-line arguments when the scripts are implemented. Keep DIV2K validation separate from training and use Kodak/Tecnick only for final evaluation. The exact dataset path layout must be kept consistent with `src/data/paths.py` and `src/data/download_data.py`.

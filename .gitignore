@@ -12,3 +12,7 @@ report.blg
 report.aux
 report.bbl
 /data/*
+
+# Generated training and evaluation artifacts
+runs/
+results/
