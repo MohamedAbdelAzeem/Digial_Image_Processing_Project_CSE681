@@ -16,6 +16,8 @@ class ExperimentSettings:
     batch_size: int = 2
     max_steps: int | None = None
     max_epochs: int | None = 1
+    num_workers: int = 0
+    device: str = "cpu"
 
     def __post_init__(self) -> None:
         positive_integers = (
@@ -51,3 +53,9 @@ class ExperimentSettings:
         # Validate that at least one of max_steps or max_epochs is set
         if self.max_steps is None and self.max_epochs is None:
             raise ValueError("At least one of max_steps or max_epochs must be set")
+
+        if type(self.num_workers) is not int or self.num_workers < 0:
+            raise ValueError("num_workers must be a non-negative integer")
+
+        if self.device not in ("cpu", "cuda"):
+            raise ValueError("device must be 'cpu' or 'cuda'")

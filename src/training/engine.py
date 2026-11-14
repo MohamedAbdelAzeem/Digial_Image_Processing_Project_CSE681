@@ -60,6 +60,7 @@ def train_one_step(
 ) -> dict[str, Tensor]:
     """Apply one rate-distortion update and the entropy-bottleneck auxiliary update."""
 
+    batch = batch.to(next(model.parameters()).device, non_blocking=True)
     model.train() # Set model to training mode for the main and auxiliary updates
     optimizer.zero_grad(set_to_none=True) # Reset gradients for main optimizer
     aux_optimizer.zero_grad(set_to_none=True) # Reset gradients for auxiliary optimizer
@@ -82,7 +83,7 @@ def train_one_step(
     aux_loss.backward() # Backpropagate auxiliary loss
     aux_optimizer.step() # Update auxiliary parameters
 
-    
+
     result = {name: value.detach() for name, value in losses.items()}
     result["aux_loss"] = aux_loss.detach()
     result["x_hat"] = output["x_hat"].detach()
@@ -100,8 +101,10 @@ def validate(
     model.eval()
     totals = {"loss": 0.0, "bpp_loss": 0.0, "mse_loss": 0.0}
     image_count = 0
+    device = next(model.parameters()).device
     with torch.no_grad():
         for batch in loader:
+            batch = batch.to(device, non_blocking=True)
             losses = criterion(model(batch), batch)
             for name in totals:
                 totals[name] += losses[name].item() * len(batch)
@@ -124,6 +127,9 @@ def train(
         raise ValueError("Training and validation directories must not overlap")
     if log_interval <= 0:
         raise ValueError("log_interval must be a positive integer")
+    device = torch.device(settings.device)
+    if device.type == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("settings.device is 'cuda' but CUDA is not available")
 
     # Does nothing if the caller has already configured logging.
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -131,14 +137,22 @@ def train(
     # torch drives initialization and quantization noise; random drives crops and flips.
     random.seed(settings.seed)
     torch.manual_seed(settings.seed)
-    model = build_scale_hyperprior(settings=settings)
+    # Initialize on the CPU so the starting weights match across devices, then move.
+    model = build_scale_hyperprior(settings=settings).to(device)
     optimizer, aux_optimizer, criterion = build_training_components(model, settings)
+    # Workers and pinned memory feed the GPU; persistent workers avoid a respawn every epoch.
+    loader_options = {
+        "batch_size": settings.batch_size,
+        "num_workers": settings.num_workers,
+        "persistent_workers": settings.num_workers > 0,
+        "pin_memory": device.type == "cuda",
+    }
     train_loader = DataLoader(
         DIV2KDataset(train_dir, crop_size=settings.crop_size),
-        batch_size=settings.batch_size,
         shuffle=True,
         # Its own generator keeps data order unchanged when only model widths change.
         generator=torch.Generator().manual_seed(settings.seed),
+        **loader_options,
     )
     valid_loader = DataLoader(
         DIV2KDataset(
@@ -148,9 +162,9 @@ def train(
             vertical_flip=False,
             random_crop=False,
         ),
-        batch_size=settings.batch_size,
         # A private generator stops validation passes from advancing the global PyTorch RNG.
         generator=torch.Generator(),
+        **loader_options,
     )
 
     logger.info("Settings: %s", settings)
@@ -162,6 +176,8 @@ def train(
         valid_dir,
     )
     logger.info("Software: torch %s, compressai %s", torch.__version__, compressai.__version__)
+    if device.type == "cuda":
+        logger.info("Device: %s", torch.cuda.get_device_name(device))
 
     epochs = itertools.count(1) if settings.max_epochs is None else range(1, settings.max_epochs + 1)
     history = []

@@ -131,6 +131,8 @@ def test_compress_decompress_roundtrip(batch, model):
         {"batch_size": 0},
         {"max_steps": 0},
         {"max_steps": None, "max_epochs": None},
+        {"num_workers": -1},
+        {"device": "tpu"},
     ],
 )
 def test_invalid_experiment_settings_are_rejected(overrides):
@@ -138,7 +140,7 @@ def test_invalid_experiment_settings_are_rejected(overrides):
 
     Steps: construct `ExperimentSettings` with one bad value per case (non-positive widths, lambda,
     crop or batch size; non-finite or negative learning rate; negative seed; zero max_steps; no
-    step and no epoch limit).
+    step and no epoch limit; negative num_workers; unsupported device).
 
     Expected: every case raises `ValueError`.
     """
@@ -289,3 +291,55 @@ def test_train_rejects_invalid_run_arguments(tmp_path):
         train(ExperimentSettings(), tmp_path, tmp_path / "valid")
     with pytest.raises(ValueError, match="log_interval"):
         train(ExperimentSettings(), tmp_path / "train", tmp_path / "valid", log_interval=0)
+
+
+def test_parallel_workers_reproduce_training(image_dirs, tiny_settings):
+    """Objective: loading data with worker processes keeps a fixed seed reproducible.
+
+    Steps: run `train` twice with `num_workers=2` and identical settings and data.
+
+    Expected: histories (ignoring elapsed time) and all weights are identical. Crops differ from
+    a `num_workers=0` run, so compare runs only at the same worker count.
+    """
+    settings = dataclasses.replace(tiny_settings, num_workers=2)
+    first_model, first_history = train(settings, *image_dirs)
+    second_model, second_history = train(settings, *image_dirs)
+
+    for record in first_history + second_history:
+        del record["elapsed_s"]
+    assert first_history == second_history
+    second_state = second_model.state_dict()
+    assert all(
+        torch.equal(value, second_state[name])
+        for name, value in first_model.state_dict().items()
+    )
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
+def test_training_runs_on_gpu(image_dirs, tiny_settings):
+    """Objective: `device="cuda"` trains and validates on the GPU.
+
+    Steps: run `train` with `device="cuda"` and `num_workers=2`.
+
+    Expected: the returned model's parameters are on CUDA and all recorded values are finite.
+    GPU results are not compared bitwise with CPU results.
+    """
+    settings = dataclasses.replace(tiny_settings, device="cuda", num_workers=2)
+
+    model, history = train(settings, *image_dirs)
+
+    assert next(model.parameters()).device.type == "cuda"
+    assert all(math.isfinite(value) for record in history for value in record.values())
+
+
+def test_cuda_request_without_cuda_fails_clearly(image_dirs, tiny_settings, monkeypatch):
+    """Objective: asking for a GPU on a machine without one fails before any work starts.
+
+    Steps: pretend CUDA is unavailable and call `train` with `device="cuda"`.
+
+    Expected: `RuntimeError` saying CUDA is not available.
+    """
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    settings = dataclasses.replace(tiny_settings, device="cuda")
+    with pytest.raises(RuntimeError, match="CUDA is not available"):
+        train(settings, *image_dirs)
