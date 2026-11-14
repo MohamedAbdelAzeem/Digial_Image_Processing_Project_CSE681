@@ -1,4 +1,4 @@
-"""PyTorch dataset for randomly cropped DIV2K training images."""
+"""PyTorch dataset for cropped DIV2K training and validation images."""
 
 import random
 from collections.abc import Sequence
@@ -15,9 +15,11 @@ IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
 
 
 class DIV2KDataset(Dataset):
-    """Load DIV2K images as normalized RGB crops with random flip augmentation.
+    """Load DIV2K images as normalized RGB crops.
 
-    `root` is one folder or a sequence of folders; the default is DIV2K train + valid (800 + 100).
+    Random crops and flips augment training; `random_crop=False` with flips disabled gives
+    deterministic center crops for validation. `root` is one folder or a sequence of folders;
+    the default is DIV2K train + valid (800 + 100).
     """
 
     def __init__(
@@ -26,11 +28,13 @@ class DIV2KDataset(Dataset):
         crop_size: int = 256,
         horizontal_flip: bool = True,
         vertical_flip: bool = True,
+        random_crop: bool = True,
     ) -> None:
         self.roots = [Path(root)] if isinstance(root, (str, Path)) else [Path(r) for r in root]
         self.crop_size = crop_size
         self.horizontal_flip = horizontal_flip
         self.vertical_flip = vertical_flip
+        self.random_crop = random_crop
 
         if crop_size <= 0:
             raise ValueError("crop_size must be a positive integer")
@@ -62,8 +66,12 @@ class DIV2KDataset(Dataset):
                 f"it is smaller than the {self.crop_size}x{self.crop_size} crop"
             )
 
-        left = random.randint(0, width - self.crop_size)
-        top = random.randint(0, height - self.crop_size)
+        if self.random_crop:
+            left = random.randint(0, width - self.crop_size)
+            top = random.randint(0, height - self.crop_size)
+        else:
+            left = (width - self.crop_size) // 2
+            top = (height - self.crop_size) // 2
         image = image.crop((left, top, left + self.crop_size, top + self.crop_size))
 
         if self.horizontal_flip and random.random() < 0.5:

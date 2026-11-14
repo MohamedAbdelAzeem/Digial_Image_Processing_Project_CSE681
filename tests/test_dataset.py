@@ -1,12 +1,13 @@
 import sys
 from pathlib import Path
 
+import numpy as np
 import pytest
 import torch
 from PIL import Image
 from torch.utils.data import DataLoader
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from data.dataset import DIV2KDataset  # noqa: E402
 from data.paths import DIV2K_DIR as REAL_DIR  # noqa: E402
@@ -36,6 +37,15 @@ def test_dataloader_batch(synthetic_dir):
 def test_crops_are_random(synthetic_dir):
     dataset = DIV2KDataset(synthetic_dir)
     assert any(not torch.equal(dataset[0], dataset[0]) for _ in range(10))
+
+
+def test_center_crop_is_deterministic(synthetic_dir):
+    dataset = DIV2KDataset(
+        synthetic_dir, horizontal_flip=False, vertical_flip=False, random_crop=False
+    )
+    with Image.open(dataset.image_paths[0]) as image:
+        expected = torch.from_numpy(np.array(image.crop((72, 22, 328, 278))))
+    assert torch.equal(dataset[0], expected.permute(2, 0, 1).float() / 255)
 
 
 def test_small_image_raises(tmp_path):

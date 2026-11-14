@@ -9,7 +9,7 @@ Each student downloads DIV2K and Kodak locally, then either:
 import os
 from pathlib import Path
 
-DEFAULT_DATA_ROOT = Path(__file__).resolve().parent / "raw"
+DEFAULT_DATA_ROOT = Path(__file__).resolve().parents[2] / "data" / "raw"
 
 RAW_DATA_ROOT = Path(os.environ.get("DIP_DATA_ROOT", DEFAULT_DATA_ROOT))
 DIV2K_DIR = RAW_DATA_ROOT / "DIV2K_train_HR"
