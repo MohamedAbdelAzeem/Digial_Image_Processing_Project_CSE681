@@ -143,9 +143,9 @@ def train(
     # Workers and pinned memory feed the GPU; persistent workers avoid a respawn every epoch.
     loader_options = {
         "batch_size": settings.batch_size,
-        "num_workers": settings.num_workers,
-        "persistent_workers": settings.num_workers > 0,
-        "pin_memory": device.type == "cuda",
+        "num_workers": settings.num_workers, # Number of DataLoader worker processes; 0 means in-process loading.
+        "persistent_workers": settings.num_workers > 0, # Keep worker processes alive across epochs if using multiple workers.
+        "pin_memory": device.type == "cuda", # Copy tensors into pinned memory before transferring to CUDA for faster host-to-device transfer.  
     }
     train_loader = DataLoader(
         DIV2KDataset(train_dir, crop_size=settings.crop_size),
