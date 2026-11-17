@@ -1,0 +1,13 @@
+# Five-epoch scratch-training pilot; not a convergence guarantee.
+num_channels: 32
+latent_channels: 48
+lmbda: 0.0067
+learning_rate: 1.0e-4
+aux_learning_rate: 1.0e-3
+crop_size: 256
+seed: 0
+batch_size: 8
+max_steps: null
+max_epochs: 5
+num_workers: 4
+device: cpu

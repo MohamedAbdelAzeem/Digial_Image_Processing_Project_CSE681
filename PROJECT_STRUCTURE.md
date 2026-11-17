@@ -46,9 +46,9 @@ Digial_Image_Processing_Project_CSE681/
 │   │   ├── checkpoint.py           # [exists] Save, restore, resume with provenance
 │   │   └── run.py                  # [exists] Run folder, logs, memory and step-time summary, codec check
 │   │
-│   ├── codec/                      # [planned: evaluation] Learned codec inference
-│   │   ├── inference.py            #   Encode/decode orchestration and padding
-│   │   └── bitstream.py            #   Store all streams and decoder metadata
+│   ├── codec/                      # Learned codec inference
+│   │   ├── inference.py            # [exists] Checkpoint loading, image round trip, and trial bitstream
+│   │   └── bitstream.py            # [planned: evaluation] Further bitstream tooling
 │   │
 │   ├── evaluation/                 # [planned: evaluation] Shared metrics and benchmark protocol
 │   │   ├── metrics.py              #   PSNR, MS-SSIM, actual-byte BPP
@@ -73,6 +73,7 @@ Digial_Image_Processing_Project_CSE681/
 │
 ├── notebooks/                      # [exists]
 │   ├── models/
+│   │   ├── codec_image_trial.ipynb # [exists] Checkpoint-based image codec trial
 │   │   └── scale_hyperprior_one_training_step.ipynb
 │   └── Evaluation/
 │       └── Student_C_JPEG_Baseline_Annotated (1).ipynb

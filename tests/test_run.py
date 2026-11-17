@@ -1,5 +1,6 @@
 """Stage 5 tooling: YAML configs, run folders, and the training script."""
 
+import json
 import logging
 import math
 import subprocess
@@ -191,3 +192,76 @@ def test_train_script_runs_from_the_command_line(data_root, tiny_config, tmp_pat
     assert "Run folder:" in result.stdout
     (run_dir,) = runs.iterdir()
     assert yaml.safe_load((run_dir / "summary.json").read_text())["steps"] == 2
+
+
+def test_plot_runs_discovers_and_selects_summaries(tmp_path):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    for name in ("first", "second"):
+        folder = runs / name
+        folder.mkdir()
+        summary = {
+            "settings": {"lmbda": 0.0067, "num_channels": 32},
+            "history": [
+                {"epoch": 1, "step": 2, "train_loss": 2.0, "val_loss": 1.8,
+                 "train_bpp_loss": 0.5, "val_bpp_loss": 0.4,
+                 "train_mse_loss": 0.01, "val_mse_loss": 0.009, "train_aux_loss": 3.0}
+            ],
+        }
+        (folder / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
+    (runs / "unfinished").mkdir()
+    output = tmp_path / "comparison.png"
+
+    discovered = subprocess.run(
+        [sys.executable, "-m", "scripts.plot_runs", "--runs-root", str(runs), "--output", str(output)],
+        cwd=REPOSITORY, capture_output=True, text=True, timeout=60,
+    )
+    assert discovered.returncode == 0, discovered.stderr
+    assert "first" in discovered.stdout and "second" in discovered.stdout
+    assert "unfinished" in discovered.stderr
+    assert output.read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
+    selected = subprocess.run(
+        [sys.executable, "-m", "scripts.plot_runs", str(runs / "first"),
+         "--output", str(tmp_path / "selected.png")],
+        cwd=REPOSITORY, capture_output=True, text=True, timeout=60,
+    )
+    assert selected.returncode == 0, selected.stderr
+    assert "first" in selected.stdout and "second" not in selected.stdout
+
+    exists = subprocess.run(
+        [sys.executable, "-m", "scripts.plot_runs", str(runs / "first"), "--output", str(output)],
+        cwd=REPOSITORY, capture_output=True, text=True, timeout=60,
+    )
+    assert exists.returncode != 0 and "already exists" in exists.stderr
+
+    missing = subprocess.run(
+        [sys.executable, "-m", "scripts.plot_runs", str(runs / "unfinished"),
+         "--output", str(tmp_path / "missing.png")],
+        cwd=REPOSITORY, capture_output=True, text=True, timeout=60,
+    )
+    assert missing.returncode != 0 and "summary.json" in missing.stderr
+
+
+def test_plot_layout_with_long_run_paths(tmp_path):
+    from scripts.plot_runs import create_plot
+    import matplotlib.pyplot as plt
+
+    history = [{"epoch": 1, "train_loss": 2.0, "val_loss": 1.8,
+                "train_bpp_loss": 0.5, "val_bpp_loss": 0.4,
+                "train_mse_loss": 0.01, "val_mse_loss": 0.009, "train_aux_loss": 3.0}]
+    runs = [(tmp_path / ("long-parent-" * 10) / f"run-{index}", {"history": history})
+            for index in range(4)]
+    figure = create_plot(runs)
+    try:
+        figure.canvas.draw()
+        axes = figure.axes[:4]
+        assert all(axis.get_position().width > 0.3 for axis in axes)
+        legend = figure.axes[4].get_legend()
+        labels = [text.get_text() for text in legend.get_texts()]
+        assert labels[:4] == [f"R{index + 1}: run-{index}" for index in range(4)]
+        bounds = legend.get_window_extent(figure.canvas.get_renderer())
+        assert figure.bbox.contains(bounds.x0, bounds.y0)
+        assert figure.bbox.contains(bounds.x1, bounds.y1)
+    finally:
+        plt.close(figure)

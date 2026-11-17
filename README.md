@@ -113,6 +113,30 @@ The command prints the run folder, normally `runs/<config>-<timestamp>/`:
 └── summary.json            metrics, timing, memory and codec check
 ```
 
+### Compare runs
+
+Plot all completed runs under `runs/` from the repository root:
+
+```powershell
+python -m scripts.plot_runs
+```
+
+To select specific run folders, pass their paths instead:
+
+```powershell
+python -m scripts.plot_runs "runs/<first-run>" "runs/<second-run>" --output "results/comparison.png"
+```
+
+For runs stored elsewhere, use `--runs-root "D:/dip-runs"` or set `DIP_RUNS_ROOT`.
+The default image is `results/training_metrics.png`; choose another `--output`
+or add `--overwrite` to replace it. The plot shows training and validation
+rate-distortion loss, estimated BPP and MSE, plus training auxiliary loss.
+Estimated BPP is not actual coded BPP. The command prints settings and final
+steps for comparison; check data fingerprints and training budgets separately.
+Step-limited runs can include a partial epoch. Folders without a valid
+`summary.json`, including unfinished runs, are skipped during discovery; an
+explicitly selected invalid folder produces an error.
+
 ### Rerun from scratch
 
 Pass a previous run's resolved configuration to `--config`. This creates a new
@@ -141,7 +165,7 @@ python -m scripts.train --resume "runs/<run-folder>" --set max_steps=40
 
 Use the same data split and environment. Only `max_steps`, `max_epochs`,
 `num_workers` and `device` may change on resume; limits count from the start of
-the run. Checkpoints are saved after validation at the end of each epoch or a
+the run. Checkpoints are saved after validation at the end of each epoch or agit log
 completed step-limited partial epoch. An interruption loses progress since the
 last checkpoint; if none exists yet, the run cannot be resumed.
 

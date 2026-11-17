@@ -19,6 +19,9 @@ from data.dataset import DIV2KDataset  # noqa: E402
 pytest.importorskip("compressai")
 from models.hyperprior import build_scale_hyperprior  # noqa: E402
 from settings import ExperimentSettings  # noqa: E402
+from codec.inference import (  # noqa: E402
+    decode_image, encode_image, export_codec_checkpoint, image_metrics, load_codec,
+)
 from training.checkpoint import (  # noqa: E402
     load_checkpoint,
     restore_checkpoint,
@@ -176,6 +179,46 @@ def test_model_factory_uses_custom_widths():
     model = build_scale_hyperprior(settings=settings)
     assert model.N == settings.num_channels
     assert model.M == settings.latent_channels
+
+
+def test_codec_checkpoint_roundtrip_with_odd_dimensions(image_dirs, tiny_settings, tmp_path):
+    settings = dataclasses.replace(tiny_settings, max_steps=1)
+    checkpoint = tmp_path / "run.pt"
+    train(settings, *image_dirs, checkpoint_path=checkpoint)
+    checkpoint_before = checkpoint.read_bytes()
+    model, loaded_settings = load_codec(checkpoint)
+    image = Image.new("RGB", (77, 65), (120, 80, 200))
+
+    bitstream = encode_image(model, image)
+    reconstruction = decode_image(model, bitstream)
+    metrics = image_metrics(image, reconstruction, bitstream)
+
+    assert loaded_settings == settings
+    assert checkpoint.read_bytes() == checkpoint_before
+    assert reconstruction.size == image.size
+    assert metrics["bytes"] == len(bitstream)
+    assert metrics["bpp"] == pytest.approx(8 * len(bitstream) / (77 * 65))
+    assert math.isfinite(metrics["psnr_db"])
+    codec_path = tmp_path / "codec.pt"
+    export_codec_checkpoint(model, loaded_settings, codec_path)
+    reloaded, reloaded_settings = load_codec(codec_path)
+    assert reloaded_settings == settings
+    assert decode_image(reloaded, bitstream).tobytes() == reconstruction.tobytes()
+    with pytest.raises(FileExistsError):
+        export_codec_checkpoint(model, loaded_settings, codec_path)
+    with pytest.raises(ValueError, match="Invalid or truncated"):
+        decode_image(model, bitstream[:-1])
+
+
+def test_codec_metrics_use_rgb_pixels_and_complete_bytes():
+    original = Image.new("RGB", (2, 2), (0, 0, 0))
+    reconstruction = Image.new("RGB", (2, 2), (10, 20, 30))
+    metrics = image_metrics(original, reconstruction, b"12345")
+
+    assert metrics["bytes"] == 5
+    assert metrics["bpp"] == 10
+    assert metrics["psnr_db"] == pytest.approx(10 * math.log10(255 ** 2 / ((100 + 400 + 900) / 3)))
+    assert math.isinf(image_metrics(original, original, b"12345")["psnr_db"])
 
 
 def write_noise_images(folder, count):
