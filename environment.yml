@@ -10,7 +10,9 @@ dependencies:
   - pytorch
   - torchvision
   - pillow
+  - psutil
   - pytest
+  - pyyaml
   - jupyterlab
   - pip
   - pip:

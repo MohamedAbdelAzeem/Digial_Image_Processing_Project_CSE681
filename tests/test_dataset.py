@@ -1,3 +1,4 @@
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -12,6 +13,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from data.dataset import DIV2KDataset  # noqa: E402
 from data.paths import DIV2K_DIR as REAL_DIR  # noqa: E402
 from data.paths import DIV2K_VALID_DIR as REAL_VALID_DIR  # noqa: E402
+
+
+@pytest.mark.parametrize("use_override", [False, True])
+def test_data_root_default_and_override(monkeypatch, tmp_path, use_override):
+    if use_override:
+        monkeypatch.setenv("DIP_DATA_ROOT", str(tmp_path))
+        expected = tmp_path
+    else:
+        monkeypatch.delenv("DIP_DATA_ROOT", raising=False)
+        expected = Path(__file__).resolve().parents[1] / "data"
+
+    spec = importlib.util.spec_from_file_location(
+        "test_data_paths", Path(__file__).resolve().parents[1] / "src" / "data" / "paths.py"
+    )
+    paths = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(paths)
+
+    assert paths.RAW_DATA_ROOT == expected
+    assert paths.DIV2K_DIR == expected / "DIV2K_train_HR"
+    assert paths.DIV2K_VALID_DIR == expected / "DIV2K_valid_HR"
+    assert paths.KODAK_DIR == expected / "kodak"
 
 
 @pytest.fixture

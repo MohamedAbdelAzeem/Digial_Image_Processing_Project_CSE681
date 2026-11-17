@@ -19,16 +19,16 @@ Digial_Image_Processing_Project_CSE681/
 ├── .github/
 │   └── STUDENT_B_DEVELOPMENT_PLAN.md   # [exists] Staged plan for the training path
 │
-├── configs/                        # [planned: Stage 5] Reproducible experiment settings
-│   ├── base.yaml                   #   Shared defaults
-│   ├── smoke_test.yaml             #   Tiny feasibility run
+├── configs/                        # [exists] Reproducible experiment settings (YAML; floats need a decimal point)
+│   ├── base.yaml                   # [exists] Shared defaults
+│   ├── smoke_test.yaml             # [exists] Bounded 20-step feasibility pilot on the GPU
 │   └── experiments/                #   One-change-at-a-time model variants
-│       ├── small.yaml              #   [planned: Stage 5/6] Compact reference model
+│       ├── small.yaml              #   [planned: Stage 6] Compact reference model
 │       ├── narrow.yaml             #   [planned: Stage 6] Reduced transform width N only
 │       └── small_latent.yaml       #   [planned: Stage 6] Reduced latent channels M only
 │
 ├── src/                            # Reusable project implementation
-│   ├── settings.py                 # [exists] Validated ExperimentSettings
+│   ├── settings.py                 # [exists] Validated ExperimentSettings and YAML config loading
 │   │
 │   ├── data/
 │   │   ├── paths.py                # [exists] Resolve data root and dataset folders
@@ -43,7 +43,8 @@ Digial_Image_Processing_Project_CSE681/
 │   │
 │   ├── training/
 │   │   ├── engine.py               # [exists] Training step, validation, train() loop
-│   │   └── checkpoint.py           # [exists] Save, restore, resume with provenance
+│   │   ├── checkpoint.py           # [exists] Save, restore, resume with provenance
+│   │   └── run.py                  # [exists] Run folder, logs, memory and step-time summary, codec check
 │   │
 │   ├── codec/                      # [planned: evaluation] Learned codec inference
 │   │   ├── inference.py            #   Encode/decode orchestration and padding
@@ -58,8 +59,8 @@ Digial_Image_Processing_Project_CSE681/
 │   └── reporting/
 │       └── report.py               # [planned: evaluation] Plots and LaTeX tables
 │
-├── scripts/                        # [planned] Thin command-line entry points
-│   ├── train.py                    #   [planned: Stage 5] Start or resume a configured run
+├── scripts/                        # Thin command-line entry points
+│   ├── train.py                    #   [exists] Start or resume a configured run
 │   └── evaluate.py                 #   [planned: evaluation] Evaluate a checkpoint on a test set
 │
 ├── tests/                          # [exists] Fast checks; default tests use synthetic data
@@ -67,7 +68,8 @@ Digial_Image_Processing_Project_CSE681/
 │   ├── test_dataset.py
 │   ├── test_download_data.py
 │   ├── test_integration_hyperprior.py
-│   └── test_jpeg_baseline.py
+│   ├── test_jpeg_baseline.py
+│   └── test_run.py
 │
 ├── notebooks/                      # [exists]
 │   ├── models/
@@ -78,12 +80,14 @@ Digial_Image_Processing_Project_CSE681/
 ├── references/
 │   └── elic_points.csv             # [planned: evaluation] Published ELIC rates with source details
 │
-├── runs/                           # [planned: Stage 5] Generated; ignored by Git
-│   └── <experiment_id>/
-│       ├── config.yaml             #   Resolved settings
-│       ├── provenance.json         #   Code, environment, seed, data fingerprint
-│       ├── checkpoints/            #   Latest and best training states
-│       └── logs/                   #   Training and validation history, console log
+├── runs/                           # [exists] Generated; ignored by Git (override with --runs-root or DIP_RUNS_ROOT)
+│   └── <config>-<timestamp>/
+│       ├── config.yaml             #   [exists] Resolved settings
+│       ├── provenance.json         #   [exists] Code, environment, data fingerprint
+│       ├── checkpoints/latest.pt   #   [exists] Latest training state
+│       ├── checkpoints/best.pt     #   [planned: Stage 6] Best validation state
+│       ├── logs/train.log          #   [exists] Training and validation log
+│       └── summary.json            #   [exists] Step time, peak memory, validation, codec check, history
 │
 └── results/                        # [planned: evaluation] Generated; ignored by Git
     └── <benchmark_id>/
@@ -95,7 +99,7 @@ Digial_Image_Processing_Project_CSE681/
 
 ## Data
 
-Datasets live outside Git under `DIP_DATA_ROOT` (default `src/data/raw`), in the flat layout that `src/data/paths.py` expects:
+Datasets live outside Git under `DIP_DATA_ROOT` (default `<repository>/data`), in the flat layout that `src/data/paths.py` expects:
 
 ```text
 <DIP_DATA_ROOT>/
@@ -113,13 +117,14 @@ Available now:
 
 ```powershell
 python -m pytest tests -q
+python -m scripts.train --config configs/smoke_test.yaml --data-root data
+python -m scripts.train --resume runs/<run> --set max_epochs=5
 cd src
 python -m data.download_data --data-root "D:/datasets/dip"
 ```
 
-Planned (Stage 5; update to the real arguments when implemented):
+Planned (evaluation; update to the real arguments when implemented):
 
 ```powershell
-python -m scripts.train --config configs/smoke_test.yaml
-python -m scripts.evaluate --checkpoint runs/experiment_id/checkpoints/best.pt --dataset kodak
+python -m scripts.evaluate --checkpoint runs/<run>/checkpoints/latest.pt --dataset kodak
 ```

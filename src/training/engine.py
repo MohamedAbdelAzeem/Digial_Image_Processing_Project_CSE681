@@ -221,6 +221,7 @@ def train(
     for epoch in epochs:
         totals = dict.fromkeys(TRAIN_METRICS, 0.0)
         epoch_steps = 0
+        epoch_start = time.perf_counter()
         for batch in train_loader:
             result = train_one_step(model, batch, optimizer, aux_optimizer, criterion)
             step += 1
@@ -242,7 +243,12 @@ def train(
             if step == settings.max_steps:
                 break
 
-        record = {"epoch": epoch, "step": step}
+        # Mean wall time per step, data loading included, validation excluded.
+        record = {
+            "epoch": epoch,
+            "step": step,
+            "train_step_s": (time.perf_counter() - epoch_start) / epoch_steps,
+        }
         record.update({f"train_{name}": totals[name] / epoch_steps for name in TRAIN_METRICS})
         validation = validate(model, valid_loader, criterion)
         record.update({f"val_{name}": value for name, value in validation.items()})
@@ -251,7 +257,7 @@ def train(
         logger.info(
             "epoch %(epoch)d done at step %(step)d: train_loss=%(train_loss).4f "
             "val_loss=%(val_loss).4f val_est_bpp=%(val_bpp_loss).4f val_mse=%(val_mse_loss).6f "
-            "elapsed=%(elapsed_s).1fs",
+            "step_time=%(train_step_s).3fs elapsed=%(elapsed_s).1fs",
             record,
         )
 

@@ -1,7 +1,12 @@
 """Validated settings for a bounded ScaleHyperprior experiment."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 import math
+from pathlib import Path
+
+import yaml
+
+CONFIG_DIR = Path(__file__).resolve().parents[1] / "configs"
 
 
 @dataclass(frozen=True)
@@ -59,3 +64,23 @@ class ExperimentSettings:
 
         if self.device not in ("cpu", "cuda"):
             raise ValueError("device must be 'cpu' or 'cuda'")
+
+
+def load_settings(
+    config_path: str | Path,
+    overrides: dict | None = None,
+    base_path: str | Path = CONFIG_DIR / "base.yaml",
+) -> ExperimentSettings:
+    """Merge the base config, the given config and `overrides`, in that order."""
+    values: dict = {}
+    for source in (base_path, config_path):
+        loaded = yaml.safe_load(Path(source).read_text(encoding="utf-8")) or {}
+        if not isinstance(loaded, dict):
+            raise ValueError(f"{source} must map setting names to values")
+        values.update(loaded)
+    values.update(overrides or {})
+
+    unknown = sorted(set(values) - {field.name for field in fields(ExperimentSettings)})
+    if unknown:
+        raise ValueError(f"Unknown setting(s): {', '.join(unknown)}")
+    return ExperimentSettings(**values)

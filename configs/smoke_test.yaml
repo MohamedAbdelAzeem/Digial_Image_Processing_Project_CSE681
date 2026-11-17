@@ -1,0 +1,5 @@
+# Bounded feasibility pilot: a few steps on real DIV2K, then one validation pass.
+# Shows that the pipeline runs and what it costs; it does not show convergence.
+max_steps: 20
+max_epochs: null
+device: cuda

@@ -236,7 +236,7 @@ def test_fixed_seed_reproduces_training(image_dirs, tiny_settings):
     """Objective: the same seed gives the same initialization, data order, crops and training.
 
     Steps: run `train` twice with identical settings and data, then compare the histories
-    (ignoring elapsed time) and every model tensor.
+    (ignoring elapsed and step times) and every model tensor.
 
     Expected: histories are equal and all weights are bitwise identical (CPU run).
     """
@@ -244,7 +244,7 @@ def test_fixed_seed_reproduces_training(image_dirs, tiny_settings):
     second_model, second_history = train(tiny_settings, *image_dirs)
 
     for record in first_history + second_history:
-        del record["elapsed_s"]
+        del record["elapsed_s"], record["train_step_s"]
     assert first_history == second_history
     second_state = second_model.state_dict()
     assert all(
@@ -311,7 +311,7 @@ def test_parallel_workers_reproduce_training(image_dirs, tiny_settings):
     second_model, second_history = train(settings, *image_dirs)
 
     for record in first_history + second_history:
-        del record["elapsed_s"]
+        del record["elapsed_s"], record["train_step_s"]
     assert first_history == second_history
     second_state = second_model.state_dict()
     assert all(
@@ -442,7 +442,7 @@ def test_resumed_run_matches_uninterrupted_run(image_dirs, tiny_settings, tmp_pa
     resumed_model, resumed_history = train(full, *image_dirs, resume_from=checkpoint)
 
     for record in full_history + resumed_history:
-        del record["elapsed_s"]
+        del record["elapsed_s"], record["train_step_s"]
     assert resumed_history == full_history
     assert_same_state(full_model.state_dict(), resumed_model.state_dict())
 

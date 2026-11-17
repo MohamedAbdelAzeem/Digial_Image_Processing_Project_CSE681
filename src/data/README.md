@@ -8,7 +8,7 @@ From the repository root, download and verify all three datasets automatically:
 python -m data.download_data
 ```
 
-The files are placed in `data/raw/` by default, or in the folder configured by
+The files are placed in `data/` by default, or in the folder configured by
 `DIP_DATA_ROOT`. To choose a folder for one run, pass it directly:
 
 ```powershell
@@ -36,7 +36,7 @@ Each student downloads the datasets on their own laptop into one folder (the
 ```
 
 All code reads the location from `data/paths.py` (`RAW_DATA_ROOT`, `DIV2K_DIR`,
-`DIV2K_VALID_DIR`, `KODAK_DIR`). The default is `data/raw/`. To use another folder, set the
+`DIV2K_VALID_DIR`, `KODAK_DIR`). The default is `data/`. To use another folder, set the
 `DIP_DATA_ROOT` environment variable once (new terminals and VS Code pick it up
 after a restart):
 
