@@ -86,7 +86,7 @@ Digial_Image_Processing_Project_CSE681/
 │       ├── config.yaml             #   [exists] Resolved settings
 │       ├── provenance.json         #   [exists] Code, environment, data fingerprint
 │       ├── checkpoints/latest.pt   #   [exists] Latest training state
-│       ├── checkpoints/best.pt     #   [planned: Stage 6] Best validation state
+│       ├── checkpoints/best.pt     #   [exists] Lowest validation-loss state
 │       ├── logs/train.log          #   [exists] Training and validation log
 │       └── summary.json            #   [exists] Step time, peak memory, validation, codec check, history
 │

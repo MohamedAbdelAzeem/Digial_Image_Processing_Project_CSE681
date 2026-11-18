@@ -126,13 +126,15 @@ def train(
     *,
     log_interval: int = 10,
     checkpoint_path: str | Path | None = None,
+    best_checkpoint_path: str | Path | None = None,
     resume_from: str | Path | None = None,
 ) -> tuple[ScaleHyperprior, list[dict[str, float]]]:
     """Train from scratch until a step or epoch limit, validating after each epoch.
 
-    `checkpoint_path` receives the latest state after every epoch. `resume_from` continues from
-    such a file at the next epoch; the limits count from the start of the whole run. A resumed
-    run matches an uninterrupted one exactly only on the CPU with `num_workers=0`.
+    `checkpoint_path` receives the latest state after every epoch. `best_checkpoint_path`
+    receives the full state when validation loss improves. `resume_from` continues from the
+    latest checkpoint; limits count from the start of the whole run. Exact resume is limited to
+    CPU with `num_workers=0`.
     """
     train_dir = Path(train_dir).resolve()
     valid_dir = Path(valid_dir).resolve()
@@ -140,6 +142,9 @@ def train(
         raise ValueError("Training and validation directories must not overlap")
     if log_interval <= 0:
         raise ValueError("log_interval must be a positive integer")
+    if checkpoint_path is not None and best_checkpoint_path is not None:
+        if Path(checkpoint_path).resolve() == Path(best_checkpoint_path).resolve():
+            raise ValueError("Latest and best checkpoint paths must be different")
     device = torch.device(settings.device)
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("settings.device is 'cuda' but CUDA is not available")
@@ -194,15 +199,63 @@ def train(
         logger.info("Device: %s", torch.cuda.get_device_name(device))
 
     last_epoch, step, history = 0, 0, []
+    best_validation_loss, best_epoch = float("inf"), 0
+    best_checkpoint_path = Path(best_checkpoint_path) if best_checkpoint_path is not None else None
     if resume_from is not None:
+        resume_checkpoint = load_checkpoint(resume_from)
         last_epoch, step, history = restore_checkpoint(
-            load_checkpoint(resume_from),
+            resume_checkpoint,
             model=model,
             optimizer=optimizer,
             aux_optimizer=aux_optimizer,
             settings=settings,
             train_generator=train_generator,
         )
+        best_validation_loss = resume_checkpoint.get("best_validation_loss")
+        best_epoch = resume_checkpoint.get("best_epoch")
+        if best_validation_loss is None or best_epoch is None:
+            if best_checkpoint_path is not None and best_checkpoint_path.is_file():
+                previous_best = load_checkpoint(best_checkpoint_path)
+                best_validation_loss = previous_best.get(
+                    "best_validation_loss", previous_best["history"][-1]["val_loss"]
+                )
+                best_epoch = previous_best.get("best_epoch", previous_best["epoch"])
+            elif history:
+                previous_best = min(history, key=lambda record: record["val_loss"])
+                best_validation_loss = previous_best["val_loss"]
+                best_epoch = previous_best["epoch"]
+            else:
+                best_validation_loss, best_epoch = float("inf"), 0
+
+        if (
+            best_checkpoint_path is not None
+            and not best_checkpoint_path.is_file()
+            and best_epoch == last_epoch
+        ):
+            save_checkpoint(
+                best_checkpoint_path,
+                model=model,
+                optimizer=optimizer,
+                aux_optimizer=aux_optimizer,
+                settings=settings,
+                epoch=last_epoch,
+                step=step,
+                history=history,
+                train_generator=train_generator,
+                provenance=resume_checkpoint.get("provenance"),
+                best_validation_loss=best_validation_loss,
+                best_epoch=best_epoch,
+            )
+        elif (
+            best_checkpoint_path is not None
+            and not best_checkpoint_path.is_file()
+            and best_epoch < last_epoch
+        ):
+            logger.warning(
+                "Best checkpoint for epoch %d is unavailable; legacy latest checkpoint is from epoch %d",
+                best_epoch,
+                last_epoch,
+            )
         logger.info("Resumed from %s after epoch %d, step %d", resume_from, last_epoch, step)
         if settings.max_steps is not None and step >= settings.max_steps:
             return model, history
@@ -254,6 +307,10 @@ def train(
         record.update({f"val_{name}": value for name, value in validation.items()})
         record["elapsed_s"] = time.perf_counter() - start
         history.append(record)
+        improved = validation["loss"] < best_validation_loss
+        if improved:
+            best_validation_loss = validation["loss"]
+            best_epoch = epoch
         logger.info(
             "epoch %(epoch)d done at step %(step)d: train_loss=%(train_loss).4f "
             "val_loss=%(val_loss).4f val_est_bpp=%(val_bpp_loss).4f val_mse=%(val_mse_loss).6f "
@@ -274,7 +331,25 @@ def train(
                 history=history,
                 train_generator=train_generator,
                 provenance=provenance,
+                best_validation_loss=best_validation_loss,
+                best_epoch=best_epoch,
             )
+        if improved and best_checkpoint_path is not None:
+            save_checkpoint(
+                best_checkpoint_path,
+                model=model,
+                optimizer=optimizer,
+                aux_optimizer=aux_optimizer,
+                settings=settings,
+                epoch=epoch,
+                step=step,
+                history=history,
+                train_generator=train_generator,
+                provenance=provenance,
+                best_validation_loss=best_validation_loss,
+                best_epoch=best_epoch,
+            )
+            logger.info("Saved best checkpoint at epoch %d (validation loss %.6f)", epoch, best_validation_loss)
         if step == settings.max_steps:
             break
 

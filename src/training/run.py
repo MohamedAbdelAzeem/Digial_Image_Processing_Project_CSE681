@@ -81,6 +81,7 @@ def run_experiment(
         settings = load_settings(saved_config, overrides, base_path=saved_config)
     (run_dir / "logs").mkdir(exist_ok=True)
     checkpoint_path = run_dir / "checkpoints" / "latest.pt"
+    best_checkpoint_path = run_dir / "checkpoints" / "best.pt"
 
     (run_dir / "config.yaml").write_text(
         yaml.safe_dump(dataclasses.asdict(settings), sort_keys=False), encoding="utf-8"
@@ -108,6 +109,7 @@ def run_experiment(
             valid_dir,
             log_interval=log_interval,
             checkpoint_path=checkpoint_path,
+            best_checkpoint_path=best_checkpoint_path,
             resume_from=checkpoint_path if resume_run is not None else None,
         )
         wall_time = time.perf_counter() - start
@@ -128,6 +130,8 @@ def run_experiment(
             "device": torch.cuda.get_device_name(device) if cuda else "cpu",
             "epochs": history[-1]["epoch"],
             "steps": history[-1]["step"],
+            "best_epoch": min(history, key=lambda record: record["val_loss"])["epoch"],
+            "best_validation_loss": min(record["val_loss"] for record in history),
             "wall_time_s": wall_time,
             "mean_train_step_s": _mean_step_seconds(history),
             "final_validation": {k: v for k, v in history[-1].items() if k.startswith("val_")},

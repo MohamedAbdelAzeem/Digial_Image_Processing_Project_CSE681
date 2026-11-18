@@ -17,7 +17,9 @@ sys.path.insert(0, str(REPOSITORY / "src"))
 
 pytest.importorskip("compressai")
 from settings import CONFIG_DIR, ExperimentSettings, load_settings  # noqa: E402
+import training.engine as training_engine  # noqa: E402
 from training.run import run_experiment  # noqa: E402
+from training.checkpoint import load_checkpoint  # noqa: E402
 
 TINY = {
     "num_channels": 8,
@@ -115,12 +117,24 @@ def test_run_experiment_writes_a_complete_run_folder(data_root, tiny_config, tmp
 
     run_dir = runs / summary["run"]
     assert summary["run"].startswith("tiny-")
-    for name in ("config.yaml", "provenance.json", "summary.json", "checkpoints/latest.pt"):
+    for name in (
+        "config.yaml",
+        "provenance.json",
+        "summary.json",
+        "checkpoints/latest.pt",
+        "checkpoints/best.pt",
+    ):
         assert (run_dir / name).is_file()
     assert "Settings: ExperimentSettings" in (run_dir / "logs" / "train.log").read_text()
     assert yaml.safe_load((run_dir / "config.yaml").read_text())["num_channels"] == 8
 
     assert summary["steps"] == 3
+    assert summary["best_validation_loss"] == min(
+        record["val_loss"] for record in summary["history"]
+    )
+    assert summary["best_epoch"] == min(
+        summary["history"], key=lambda record: record["val_loss"]
+    )["epoch"]
     assert all(math.isfinite(value) for value in summary["final_validation"].values())
     assert summary["mean_train_step_s"] > 0
     assert summary["peak_host_memory_mb"] > 0
@@ -158,6 +172,42 @@ def test_run_experiment_resumes_a_run_folder(data_root, tiny_config, tmp_path):
     assert (first["steps"], second["steps"]) == (2, 4)
     assert [record["epoch"] for record in second["history"]] == [1, 2]
     assert second["run"] == first["run"]
+    best = load_checkpoint(run_dir / "checkpoints" / "best.pt")
+    assert best["best_epoch"] == second["best_epoch"]
+    assert best["best_validation_loss"] == second["best_validation_loss"]
+
+
+def test_resume_preserves_best_checkpoint_when_validation_worsens(
+    data_root, tiny_config, tmp_path, monkeypatch
+):
+    losses = iter((0.5, 0.4, 0.6))
+    monkeypatch.setattr(
+        training_engine,
+        "validate",
+        lambda *_args: {"loss": next(losses), "bpp_loss": 0.2, "mse_loss": 0.01},
+    )
+    kwargs = {
+        "train_dir": data_root / "DIV2K_train_HR",
+        "valid_dir": data_root / "DIV2K_valid_HR",
+    }
+    first = run_experiment(
+        tiny_config, tmp_path / "runs", overrides={"max_steps": 3}, **kwargs
+    )
+    run_dir = tmp_path / "runs" / first["run"]
+    before_resume = load_checkpoint(run_dir / "checkpoints" / "best.pt")
+
+    resumed = run_experiment(
+        None, tmp_path / "runs", resume_run=run_dir, overrides={"max_steps": 5}, **kwargs
+    )
+
+    after_resume = load_checkpoint(run_dir / "checkpoints" / "best.pt")
+    latest = load_checkpoint(run_dir / "checkpoints" / "latest.pt")
+    assert before_resume["best_epoch"] == 2
+    assert resumed["history"][-1]["val_loss"] == 0.6
+    assert after_resume["best_epoch"] == 2
+    assert after_resume["best_validation_loss"] == 0.4
+    assert latest["best_epoch"] == after_resume["best_epoch"]
+    assert latest["best_validation_loss"] == after_resume["best_validation_loss"]
 
 
 def test_train_script_runs_from_the_command_line(data_root, tiny_config, tmp_path):

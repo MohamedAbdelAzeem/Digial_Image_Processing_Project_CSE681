@@ -109,7 +109,8 @@ The command prints the run folder, normally `runs/<config>-<timestamp>/`:
 ├── config.yaml             resolved settings
 ├── provenance.json         code, software and data fingerprints
 ├── logs/train.log          training and validation log
-├── checkpoints/latest.pt   latest saved training state
+├── checkpoints/latest.pt   latest saved state; use this to resume
+├── checkpoints/best.pt     lowest validation-loss model; use this for evaluation
 └── summary.json            metrics, timing, memory and codec check
 ```
 

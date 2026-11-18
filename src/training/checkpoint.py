@@ -82,6 +82,8 @@ def save_checkpoint(
     history: list[dict],
     train_generator: torch.Generator,
     provenance: dict | None,
+    best_validation_loss: float | None = None,
+    best_epoch: int | None = None,
 ) -> None:
     """Write the training state after a completed epoch."""
     path = Path(path)
@@ -91,6 +93,8 @@ def save_checkpoint(
         "epoch": epoch,
         "step": step,
         "history": history,
+        "best_validation_loss": best_validation_loss,
+        "best_epoch": best_epoch,
         "model": model.state_dict(),
         "optimizer": optimizer.state_dict(),
         "aux_optimizer": aux_optimizer.state_dict(),
