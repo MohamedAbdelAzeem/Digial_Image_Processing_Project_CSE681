@@ -1,4 +1,4 @@
-# Shared defaults. Every other config lists only the settings it changes.
+# Shared five-epoch GPU tuning preset. Variant configs list only settings they change.
 # Write floats with a decimal point (1.0e-4): YAML reads 1e-4 as text.
 num_channels: 32
 latent_channels: 48
@@ -9,6 +9,6 @@ crop_size: 256
 seed: 0
 batch_size: 8
 max_steps: null
-max_epochs: 1
-num_workers: 0
-device: cpu
+max_epochs: 5
+num_workers: 4
+device: cuda

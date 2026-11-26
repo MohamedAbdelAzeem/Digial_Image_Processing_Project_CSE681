@@ -73,9 +73,11 @@ configs/base.yaml          shared defaults
 -> --set                   command-line overrides
 ```
 
-For example, `base.yaml` defines `num_channels: 32`, `latent_channels: 48`,
-`max_epochs: 1` and `device: cpu`. The smoke file changes the limits to
-`max_steps: 20` and `max_epochs: null`, and selects `device: cuda`.
+For tuning, `base.yaml` fixes the reference widths (`num_channels: 32`,
+`latent_channels: 48`), lambda, learning rates, crop size, seed, batch size,
+five-epoch budget, `num_workers: 4` and `device: cuda`. A parameter-variant YAML
+only overrides the parameter being tested. The smoke file overrides the budget
+to 20 steps and uses `num_workers: 0` to avoid worker startup overhead.
 This command additionally changes the model width to 24 for a new run:
 
 ```powershell
@@ -95,10 +97,9 @@ max_epochs: null (# no limit)
 python -m scripts.train --config configs/experiments/narrow.yaml --set batch_size=4
 ```
 
-The variant inherits from `base.yaml`, not `smoke_test.yaml`; include desired
-limits and device in the variant. Write scientific notation with a decimal point,
-such as `1.0e-4`. When both step and epoch limits are set, the first reached
-stops the run. Keep data, seed, lambda and budget fixed when comparing widths.
+Each command starts a separate run. Keep data, seed, lambda and budget fixed when
+comparing widths. Write scientific notation with a decimal point, such as
+`1.0e-4`. When both step and epoch limits are set, the first reached stops the run.
 
 ### Run files
 

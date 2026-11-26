@@ -1,5 +1,6 @@
 """Stage 5 tooling: YAML configs, run folders, and the training script."""
 
+import dataclasses
 import json
 import logging
 import math
@@ -77,6 +78,19 @@ def test_config_values_override_base_and_overrides_win(tiny_config):
     assert (settings.num_channels, settings.max_steps) == (8, 3)
     assert settings.lmbda == base.lmbda
     assert load_settings(tiny_config, {"max_steps": 5}).max_steps == 5
+
+
+def test_n_width_configs_change_only_num_channels():
+    base = load_settings(CONFIG_DIR / "base.yaml")
+    base_values = dataclasses.asdict(base)
+
+    for name, expected_channels in (("narrow.yaml", 24), ("wide.yaml", 48)):
+        settings = load_settings(CONFIG_DIR / "experiments" / name)
+        values = dataclasses.asdict(settings)
+        assert values["num_channels"] == expected_channels
+        assert {key: value for key, value in values.items() if key != "num_channels"} == {
+            key: value for key, value in base_values.items() if key != "num_channels"
+        }
 
 
 def test_config_rejects_unknown_and_mistyped_values(tmp_path):

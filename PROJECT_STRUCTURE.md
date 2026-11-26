@@ -24,7 +24,8 @@ Digial_Image_Processing_Project_CSE681/
 │   ├── smoke_test.yaml             # [exists] Bounded 20-step feasibility pilot on the GPU
 │   └── experiments/                #   One-change-at-a-time model variants
 │       ├── small.yaml              #   [planned: Stage 6] Compact reference model
-│       ├── narrow.yaml             #   [planned: Stage 6] Reduced transform width N only
+│       ├── narrow.yaml             #   [exists] N=24, M inherited from base
+│       ├── wide.yaml               #   [exists] N=48, M inherited from base
 │       └── small_latent.yaml       #   [planned: Stage 6] Reduced latent channels M only
 │
 ├── src/                            # Reusable project implementation

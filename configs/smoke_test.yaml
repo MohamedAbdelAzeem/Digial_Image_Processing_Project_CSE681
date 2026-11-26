@@ -2,4 +2,5 @@
 # Shows that the pipeline runs and what it costs; it does not show convergence.
 max_steps: 20
 max_epochs: null
+num_workers: 0
 device: cuda
