@@ -3,4 +3,5 @@ num_channels: 64
 latent_channels: 96
 epochs: 250
 learning_rate: 1.0e-4
+device: cpu
 
