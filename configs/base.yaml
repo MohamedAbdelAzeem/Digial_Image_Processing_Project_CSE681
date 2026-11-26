@@ -1,9 +1,9 @@
 # Shared five-epoch GPU tuning preset. Variant configs list only settings they change.
 # Write floats with a decimal point (1.0e-4): YAML reads 1e-4 as text.
-num_channels: 32
-latent_channels: 48
-lmbda: 0.0067
-learning_rate: 1.0e-4
+num_channels: 32 # Number of channels in the network's layers
+latent_channels: 48 # Number of latent channels in the network's layers
+lmbda: 0.0067 # {0.0035, 0.0067, 0.013, 0.025, 0.0483} higher values favor compression over quality
+learning_rate: 1.0e-4 # 0.0001
 aux_learning_rate: 1.0e-3
 crop_size: 256
 seed: 0
