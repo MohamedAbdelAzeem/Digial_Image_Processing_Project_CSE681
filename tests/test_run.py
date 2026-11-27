@@ -329,3 +329,47 @@ def test_plot_layout_with_long_run_paths(tmp_path):
         assert figure.bbox.contains(bounds.x1, bounds.y1)
     finally:
         plt.close(figure)
+
+
+def test_plot_kodak_rd_averages_selected_checkpoint(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    import matplotlib.pyplot as plt
+
+    from scripts import plot_kodak_rd
+
+    run_dir = tmp_path / "lambda013"
+    checkpoint_dir = run_dir / "checkpoints"
+    checkpoint_dir.mkdir(parents=True)
+    (checkpoint_dir / "best.pt").write_bytes(b"test checkpoint")
+    images = []
+    for index in range(24):
+        image_path = tmp_path / f"kodim{index:02d}.png"
+        Image.new("RGB", (8, 8), (index, 0, 0)).save(image_path)
+        images.append(image_path)
+
+    settings = SimpleNamespace(lmbda=0.013, num_channels=64, latent_channels=96)
+    monkeypatch.setattr(plot_kodak_rd, "load_codec", lambda path: (object(), settings))
+    monkeypatch.setattr(plot_kodak_rd, "encode_image", lambda model, image: b"bits")
+    monkeypatch.setattr(plot_kodak_rd, "decode_image", lambda model, bitstream: object())
+    monkeypatch.setattr(
+        plot_kodak_rd,
+        "image_metrics",
+        lambda original, reconstruction, bitstream: {
+            "bpp": float(original.getpixel((0, 0))[0]),
+            "psnr_db": float(original.getpixel((0, 0))[0] + 20),
+        },
+    )
+
+    result = plot_kodak_rd.evaluate_checkpoint(run_dir, "best.pt", images)
+    assert result["image_count"] == 24
+    assert result["mean_bpp"] == 11.5
+    assert result["mean_psnr_db"] == 31.5
+
+    figure = plot_kodak_rd.create_plot([result])
+    try:
+        x_values, y_values = figure.axes[0].lines[0].get_data()
+        assert list(x_values) == [11.5]
+        assert list(y_values) == [31.5]
+    finally:
+        plt.close(figure)

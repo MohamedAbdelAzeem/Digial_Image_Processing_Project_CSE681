@@ -4,4 +4,4 @@ latent_channels: 96
 max_epochs: 250
 learning_rate: 1.0e-4
 device: cpu
-
+lmbda: 0.0067
